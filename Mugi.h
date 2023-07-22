@@ -24,17 +24,18 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	virtual void onUnload();
 
 	void createNameTable(bool);
-	void updatePlayerCam(std::string);
-	void updateAutoCam(std::string);
 	//void updateScore(std::string);
 	void startGame(std::string);
 	void scored(std::string);
 	void tick(std::string);
+	void tickPlayer(std::string);
+	void tickBoost(ServerWrapper sw);
+	void tickScore(std::string);
 	void initSocket();
 	void endSocket();
 	bool sendSocket(std::string);
 	void endGame(std::string);
-	std::string split(const std::string& s);
+	//std::string split(const std::string& s);
 	//void onUnload() override; // Uncomment and implement if you need a unload method
 
 private:
@@ -43,32 +44,23 @@ private:
 	SOCKET sock;
 	struct sockaddr_in server;
 	std::unordered_map<std::string, std::shared_ptr<PriWrapper>> PlayerMap;
-	bool isBoostWatching = false;
+	bool isBoostWatching = true;
 	struct playerData {
 		std::string name;
+		std::string id;
 		unsigned char team;//isblue
 	};
 	struct carData {
 		std::shared_ptr<CarWrapper> car;
 		unsigned char isBot;
 	};
-	struct resultData {
-		std::string name;
-		unsigned char team;
-		int score;
-		int goals;
-		int assists;
-		int saves;
-		int shots;
-		int demos;
-		int touches;
-	};
 	std::vector<playerData> OwnerMap;
 	std::unordered_map<std::string, int> OwnerIndexMap;
-	std::vector<resultData> MatchResults;
+
 	int Boosts[10];
 	std::unordered_map<std::string, std::string> DisplayName2Id;
 	std::unordered_map<std::string, std::string> Id2DisplayName;
+	std::unordered_map<std::string, std::string> Id2DisplayName_debug;
 	std::unordered_map<std::string, std::string> PlayerToDisplayName;
 	std::unordered_map<std::string, std::string> UniqueID2DisplayName;
 	std::string preActorName = "";
@@ -80,7 +72,8 @@ private:
 	int dst_socket;
 	std::string preMsg = "";
 	std::string msg = "";
-
+	bool isSendSocket = true;
+	bool isDebug = false;
 
 	//void RenderSettings() override; // Uncomment if you wanna render your own tab in the settings menu
 	//void RenderWindow() override; // Uncomment if you want to render your own plugin window
