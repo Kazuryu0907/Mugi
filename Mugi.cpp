@@ -168,7 +168,7 @@ void Mugi::createNameTable(bool isForcedRun)
 		//本来はuniqueID
 		std::string playerId = TOS(i);
 		// if human
-		if (!pl.GetbBot())playerId = "Player_" + pl.GetUniqueIdWrapper().GetIdString();
+		if (!pl.GetbBot())playerId = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
 
 
 		//観戦時のプレイヤー名に合わせるため
@@ -278,10 +278,25 @@ void Mugi::tick(std::string eventName) {
 	if (gw.IsNull())return;
 	CameraWrapper camera = gameWrapper->GetCamera();
 	std::string actorName = camera.GetFocusActor();
+	if (!isDebug)actorName = split(camera.GetFocusActor());
 	//----------player------------//
 	tickPlayer(actorName);
 	//----------boost-------------//
 	tickBoost(gw);
 	//----------score-------------//
 	tickScore(actorName);
+}
+
+
+std::string Mugi::split(const std::string& s) {
+	std::vector<std::string> elems;
+	std::stringstream ss(s);
+	std::string item;
+	while (std::getline(ss, item, '|')) {
+		if (!item.empty()) {
+			elems.push_back(item);
+		}
+	}
+	if (elems.size() != 3)return "";
+	return elems[1];
 }

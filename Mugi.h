@@ -35,6 +35,8 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	void endSocket();
 	bool sendSocket(std::string);
 	void endGame(std::string);
+
+	std::string split(const std::string& s);
 	//std::string split(const std::string& s);
 	//void onUnload() override; // Uncomment and implement if you need a unload method
 
