@@ -124,7 +124,7 @@ void Mugi::endGame(std::string eventName) {
 		if (pl.IsNull())continue;
 		if (pl.GetTeamNum() == 255)continue;
 
-		j["names"] = (pl.GetPlayerName().ToString());
+		j["names"] = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
 		j["teams"] = (pl.GetTeamNum());
 		j["scores"] = (pl.GetMatchScore());
 		j["goals"] = (pl.GetMatchGoals());
@@ -223,7 +223,7 @@ void Mugi::tickBoost(ServerWrapper gw) {
 			json root;
 			json j;
 			j["boost"] = boost;
-			j["index"] = i;
+			j["index"] = OwnerIndexMap[playerId];
 			root["cmd"] = "boost";
 			root["data"] = j;
 			if (boost != Boosts[i])sendSocket(root.dump());
