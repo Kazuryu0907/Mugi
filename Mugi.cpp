@@ -124,7 +124,7 @@ void Mugi::endGame(std::string eventName) {
 		if (pl.IsNull())continue;
 		if (pl.GetTeamNum() == 255)continue;
 
-		j["names"] = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
+		j["id"] = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
 		j["teams"] = (pl.GetTeamNum());
 		j["scores"] = (pl.GetMatchScore());
 		j["goals"] = (pl.GetMatchGoals());
@@ -236,6 +236,17 @@ void Mugi::tickScore(std::string actorName) {
 	if (PlayerMap.count(actorName) == 0) return;
 	auto pl = PlayerMap[actorName];
 	currentFocusActorScore = pl->GetMatchScore();
+	json subScore;
+	subScore["goals"] = pl->GetMatchGoals();
+	subScore["shots"] = pl->GetMatchShots();
+	subScore["assists"] = pl->GetMatchAssists();
+	subScore["saves"] = pl->GetMatchSaves();
+	if (preSubScore != subScore.dump()) {
+		json root;
+		root["cmd"] = "subScore";
+		root["data"] = subScore;
+		sendSocket(root.dump());
+	}
 	if (currentFocusActorScore != preFocusActorScore) {
 		json root;
 		json j;
@@ -245,6 +256,7 @@ void Mugi::tickScore(std::string actorName) {
 		sendSocket(root.dump());
 	}
 	preFocusActorScore = currentFocusActorScore;
+	preSubScore = subScore.dump();
 }
 
 void Mugi::tickPlayer(std::string actorName) {
@@ -279,11 +291,9 @@ void Mugi::tick(std::string eventName) {
 	CameraWrapper camera = gameWrapper->GetCamera();
 	std::string actorName = camera.GetFocusActor();
 	if (!isDebug)actorName = split(camera.GetFocusActor());
-	//----------player------------//
+	//----------tick------------//
 	tickPlayer(actorName);
-	//----------boost-------------//
 	tickBoost(gw);
-	//----------score-------------//
 	tickScore(actorName);
 }
 

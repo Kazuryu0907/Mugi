@@ -56,6 +56,7 @@ private:
 		std::shared_ptr<CarWrapper> car;
 		unsigned char isBot;
 	};
+	std::string preSubScore;
 	std::vector<playerData> OwnerMap;
 	std::unordered_map<std::string, int> OwnerIndexMap;
 
@@ -75,7 +76,7 @@ private:
 	std::string preMsg = "";
 	std::string msg = "";
 	bool isSendSocket = true;
-	bool isDebug = false;
+	bool isDebug = true;
 
 	//void RenderSettings() override; // Uncomment if you wanna render your own tab in the settings menu
 	//void RenderWindow() override; // Uncomment if you want to render your own plugin window
