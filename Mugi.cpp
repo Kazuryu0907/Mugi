@@ -117,6 +117,7 @@ void Mugi::endGame(std::string eventName) {
 	std::vector<json> Stats;
 
 	ArrayWrapper<PriWrapper> pls = sw.GetPRIs();
+	int debugIndex = 0;
 	for (int i = 0; i < pls.Count(); i++) {
 		json j;
 
@@ -124,7 +125,8 @@ void Mugi::endGame(std::string eventName) {
 		if (pl.IsNull())continue;
 		if (pl.GetTeamNum() == 255)continue;
 
-		j["id"] = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
+		if(!isDebug)j["id"] = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
+		else j["id"] = TOS(debugIndex);
 		j["teams"] = (pl.GetTeamNum());
 		j["scores"] = (pl.GetMatchScore());
 		j["goals"] = (pl.GetMatchGoals());
@@ -134,6 +136,7 @@ void Mugi::endGame(std::string eventName) {
 		j["demos"] = (pl.GetMatchDemolishes());
 		j["ballTouches"] = (pl.GetBallTouches());
 		Stats.push_back(j);
+		debugIndex++;
 	}
 	//orange H->L -> blue H->L
 	std::sort(Stats.begin(), Stats.end(), [](const json& a, const json& b) {return(a["scores"] > b["scores"]); });
