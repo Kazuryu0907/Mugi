@@ -59,6 +59,7 @@ private:
 	std::string preSubScore;
 	std::vector<playerData> OwnerMap;
 	std::unordered_map<std::string, int> OwnerIndexMap;
+	std::unordered_map<std::string, std::string> OwnerTeamMap;
 
 	int Boosts[10];
 	std::unordered_map<std::string, std::string> DisplayName2Id;

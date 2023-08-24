@@ -72,7 +72,6 @@ void Mugi::onUnload()
 void Mugi::initSocket() {
 	WSADATA wsaData;
 	struct sockaddr_in server;
-	char buf[32];
 	cvarManager->log("initilizing socket...");
 	if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0) {
 		cvarManager->log("send error");
@@ -197,8 +196,14 @@ void Mugi::createNameTable(bool isForcedRun)
 	std::vector<std::string> PlayerIndexs;
 	for (int i = 0; i < OwnerMap.size(); i++) {
 		auto p = OwnerMap[i];
-		if (isDebug)OwnerIndexMap[p.name] = i;
-		else OwnerIndexMap[p.id] = i;
+		if (isDebug) {
+			OwnerIndexMap[p.name] = i;
+			OwnerTeamMap[p.name] = p.team == 1 ? "orange" : "blue";
+		}
+		else {
+			OwnerIndexMap[p.id] = i;
+			OwnerTeamMap[p.id] = p.team == 1 ? "orange" : "blue";
+		}
 		cvarManager->log("name!"+p.name);
 		//後々p.nameからidに代わる予定
 		if (isDebug) PlayerIndexs.push_back(TOS(i));
@@ -275,6 +280,7 @@ void Mugi::tickPlayer(std::string actorName) {
 			json j;
 			root["cmd"] = "player";
 			j["playerIndex"] = TOS(OwnerIndexMap[actorName]);
+			j["team"] = OwnerTeamMap[actorName];
 			if (isDebug) {
 				j["playerName"] = actorName;
 			}
