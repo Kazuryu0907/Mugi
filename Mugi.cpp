@@ -17,12 +17,14 @@ void Mugi::onLoad()
 	root["cmd"] = "init";
 	sendSocket(root.dump());
 	createNameTable(true);
-	//gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.OnGameTimeUpdated", std::bind(&Mugi::updateScore, this, std::placeholders::_1));
+	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.OnGameTimeUpdated", std::bind(&Mugi::updateTime, this, std::placeholders::_1));
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.EventMatchEnded", std::bind(&Mugi::endGame, this, std::placeholders::_1));
 	gameWrapper->HookEvent("Function TAGame.ReplayDirector_TA.Tick", std::bind(&Mugi::tick, this, std::placeholders::_1));
 	//Function GameEvent_Soccar_TA.Active.StartRound
 	gameWrapper->HookEvent("Function GameEvent_Soccar_TA.Active.BeginState", std::bind(&Mugi::startGame, this, std::placeholders::_1));
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.EventPlayerScored", std::bind(&Mugi::scored, this, std::placeholders::_1));
+	gameWrapper->HookEventWithCallerPost<ActorWrapper>("Function TAGame.ReplayDirector_TA.OnScoreDataChanged", std::bind(&Mugi::onGoal, this, std::placeholders::_1));
+
 	struct DemolishData {
 		uintptr_t attacker;
 	};
@@ -114,8 +116,8 @@ void Mugi::endGame(std::string eventName) {
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
 	if (sw.IsNull())return;
 	std::vector<json> Stats;
-
 	ArrayWrapper<PriWrapper> pls = sw.GetPRIs();
+	cvarManager->log(TOS(sw.GetMatchWinner().GetScore()));
 	int debugIndex = 0;
 	for (int i = 0; i < pls.Count(); i++) {
 		json j;
@@ -125,7 +127,7 @@ void Mugi::endGame(std::string eventName) {
 		if (pl.GetTeamNum() == 255)continue;
 
 		if(!isDebug)j["id"] = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
-		else j["id"] = TOS(debugIndex);
+		else j["id"] = TOS(botIndex[debugIndex]);
 		j["teams"] = (pl.GetTeamNum());
 		j["scores"] = (pl.GetMatchScore());
 		j["goals"] = (pl.GetMatchGoals());
@@ -139,12 +141,39 @@ void Mugi::endGame(std::string eventName) {
 	}
 	//orange H->L -> blue H->L
 	std::sort(Stats.begin(), Stats.end(), [](const json& a, const json& b) {return(a["scores"] > b["scores"]); });
-	std::sort(Stats.begin(), Stats.end(), [](const json& a, const json& b) {return(a["teams"] > b["teams"]); });
+	std::sort(Stats.begin(), Stats.end(), [](const json& a, const json& b) {return(a["teams"] < b["teams"]); });
 
 	root["cmd"] = "stats";
 	root["data"] = Stats;
 	sendSocket(root.dump());
 }
+
+void Mugi::onGoal(ActorWrapper caller) {
+	ReplayDirectorWrapper RDW(caller.memory_address);
+	ReplayScoreData ScoreData = RDW.GetReplayScoreData();
+	if (ScoreData.ScoredBy == 0)return;
+	PriWrapper pl(ScoreData.ScoredBy);
+	PriWrapper assistPl(ScoreData.AssistedBy);
+	if (pl.IsNull())return;
+	int team = ScoreData.ScoreTeam;
+	std::string scorerId = pl.GetbBot() ? botId2Id[pl.GetOldName().ToString()] : split(pl.GetUniqueIdWrapper().GetIdString());
+	std::string assisterId = "";
+	if (!assistPl.IsNull()) {
+		assisterId = assistPl.GetbBot() ? botId2Id[assistPl.GetOldName().ToString()] : split(assistPl.GetUniqueIdWrapper().GetIdString());
+	}
+	ServerWrapper sw = gameWrapper->GetOnlineGame();
+	cvarManager->log(TOS(sw.GetTeams().Get(0).GetScore())+":"+ TOS(sw.GetTeams().Get(1).GetScore()));
+	json j;
+	j["team"] = team == 0 ? "blue" : "orange";
+	j["scoreId"] = scorerId;
+	j["assistId"] = assisterId;
+	json root;
+	root["cmd"] = "goals";
+	root["data"] = j;
+	sendSocket(root.dump());
+	cvarManager->log(ScoreData.ScoreTeam == 1 ? "blue" : "orange");
+}
+
 
 void Mugi::createNameTable(bool isForcedRun)
 {
@@ -163,12 +192,31 @@ void Mugi::createNameTable(bool isForcedRun)
 	UniqueID2DisplayName.clear();
 	OwnerIndexMap.clear();
 	//----------------//
+	int botBlueNum = 0;
+	int botOrangeNum = 0;
+	int botCount = 0;
+	
 	for (int i = 0; i < pls.Count(); i++) {
 		auto pl = pls.Get(i);
 		if (pl.IsNull())continue;
 		std::string displayName = "";
 		//本来はuniqueID
-		std::string playerId = TOS(i);
+		int botId = 0;
+		if (pl.GetbBot()) {
+			if (pl.GetTeamNum() == 0) {//blue
+				botId = botBlueNum;
+				botBlueNum++;
+			}
+			else if (pl.GetTeamNum() == 1) {
+				botId = botOrangeNum + 3;
+				botOrangeNum++;
+			}
+			botIndex[botCount] = botId;
+			botId2Id[pl.GetOldName().ToString()] = botId;
+			botCount++;
+		}
+		
+		std::string playerId = TOS(botId);
 		// if human
 		if (!pl.GetbBot())playerId = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
 
@@ -197,7 +245,7 @@ void Mugi::createNameTable(bool isForcedRun)
 	for (int i = 0; i < OwnerMap.size(); i++) {
 		auto p = OwnerMap[i];
 		if (isDebug) {
-			OwnerIndexMap[p.name] = i;
+			OwnerIndexMap[p.name] = botIndex[i];
 			OwnerTeamMap[p.name] = p.team == 1 ? "orange" : "blue";
 		}
 		else {
@@ -212,6 +260,17 @@ void Mugi::createNameTable(bool isForcedRun)
 	json root;
 	root["cmd"] = "playerTable";
 	root["data"] = PlayerIndexs;
+	sendSocket(root.dump());
+}
+
+void Mugi::updateTime(std::string eventName)
+{
+	ServerWrapper sw = gameWrapper->GetOnlineGame();
+	if (sw.IsNull())return;
+	json root;
+	root["cmd"] = "time";
+	int time = sw.GetbOverTime() ? sw.GetOvertimeTimePlayed() : sw.GetSecondsRemaining();
+	root["data"] = time;
 	sendSocket(root.dump());
 }
 

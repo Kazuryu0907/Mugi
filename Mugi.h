@@ -24,13 +24,14 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	virtual void onUnload();
 
 	void createNameTable(bool);
-	//void updateScore(std::string);
+	void updateTime(std::string);
 	void startGame(std::string);
 	void scored(std::string);
 	void tick(std::string);
 	void tickPlayer(std::string);
 	void tickBoost(ServerWrapper sw);
 	void tickScore(std::string);
+	void onGoal(ActorWrapper caller);
 	void initSocket();
 	void endSocket();
 	bool sendSocket(std::string);
@@ -62,6 +63,8 @@ private:
 	std::unordered_map<std::string, std::string> OwnerTeamMap;
 
 	int Boosts[10];
+	int botIndex[6] = { 0,0,0,0,0,0 };
+	std::unordered_map<std::string, std::string> botId2Id;
 	std::unordered_map<std::string, std::string> DisplayName2Id;
 	std::unordered_map<std::string, std::string> Id2DisplayName;
 	std::unordered_map<std::string, std::string> Id2DisplayName_debug;
@@ -77,7 +80,7 @@ private:
 	std::string preMsg = "";
 	std::string msg = "";
 	bool isSendSocket = true;
-	bool isDebug = true;
+	bool isDebug = false;
 
 	//void RenderSettings() override; // Uncomment if you wanna render your own tab in the settings menu
 	//void RenderWindow() override; // Uncomment if you want to render your own plugin window
