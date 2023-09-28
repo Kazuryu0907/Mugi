@@ -34,6 +34,8 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	void onGoal(ActorWrapper caller);
 	void initSocket();
 	void endSocket();
+	void calcSetPoint(ServerWrapper sw);
+	void resetSetPoint(ServerWrapper sw);
 	bool sendSocket(std::string);
 	void endGame(std::string);
 
@@ -57,10 +59,20 @@ private:
 		std::shared_ptr<CarWrapper> car;
 		unsigned char isBot;
 	};
+	struct s_currentSetPoint {
+		int blue = 0;
+		int orange = 0;
+	};
+	struct s_preTeamName {
+		std::string blue = "";
+		std::string orange = "";
+	};
 	std::string preSubScore;
 	std::vector<playerData> OwnerMap;
 	std::unordered_map<std::string, int> OwnerIndexMap;
 	std::unordered_map<std::string, std::string> OwnerTeamMap;
+	struct s_currentSetPoint currentSetPoint;
+	struct s_preTeamName preTeamName;
 
 	int Boosts[10];
 	int botIndex[6] = { 0,0,0,0,0,0 };
@@ -80,7 +92,7 @@ private:
 	std::string preMsg = "";
 	std::string msg = "";
 	bool isSendSocket = true;
-	bool isDebug = false;
+	bool isDebug = true;
 
 	//void RenderSettings() override; // Uncomment if you wanna render your own tab in the settings menu
 	//void RenderWindow() override; // Uncomment if you want to render your own plugin window
