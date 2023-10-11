@@ -53,7 +53,7 @@ private:
 	struct playerData {
 		std::string name;
 		std::string id;
-		unsigned char team;//isblue
+		unsigned char team;//isOrange
 	};
 	struct carData {
 		std::shared_ptr<CarWrapper> car;

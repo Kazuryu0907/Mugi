@@ -254,6 +254,7 @@ void Mugi::createNameTable(bool isForcedRun)
 	int botCount = 0;
 	
 	for (int i = 0; i < pls.Count(); i++) {
+		cvarManager->log("---------");
 		auto pl = pls.Get(i);
 		if (pl.IsNull())continue;
 		std::string displayName = "";
@@ -264,16 +265,17 @@ void Mugi::createNameTable(bool isForcedRun)
 				botId = botBlueNum;
 				botBlueNum++;
 			}
-			else if (pl.GetTeamNum() == 1) {
+			else if (pl.GetTeamNum() == 1) {//orange
 				botId = botOrangeNum + 3;
 				botOrangeNum++;
 			}
 			botIndex[botCount] = botId;
 			botId2Id[pl.GetOldName().ToString()] = botId;
 			botCount++;
+			cvarManager->log("botIndex:" + TOS(botId));
 		}
-		
 		std::string playerId = TOS(botId);
+
 		// if human
 		if (!pl.GetbBot())playerId = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
 
@@ -289,7 +291,7 @@ void Mugi::createNameTable(bool isForcedRun)
 
 		DisplayName2Id[displayName] = playerId;
 		Id2DisplayName[playerId] = displayName;
-		cvarManager->log(":=" + playerId);
+		cvarManager->log(":=" + playerId+":"+TOS(pl.GetTeamNum()));
 		if (pl.GetTeamNum() != 255) {//not �ϐ��
 			playerData p = { displayName,playerId ,pl.GetTeamNum() };//isblue
 			OwnerMap.push_back(p);
@@ -297,12 +299,13 @@ void Mugi::createNameTable(bool isForcedRun)
 
 	}
 	//�`�[����sort
-	std::sort(OwnerMap.begin(), OwnerMap.end(), [](const playerData& a, const playerData& b) {return(a.team > b.team); });
+	//koujun ni henkou
+	std::sort(OwnerMap.begin(), OwnerMap.end(), [](const playerData& a, const playerData& b) {return(a.team < b.team); });
 	std::vector<std::string> PlayerIndexs;
 	for (int i = 0; i < OwnerMap.size(); i++) {
 		auto p = OwnerMap[i];
 		if (isDebug) {
-			OwnerIndexMap[p.name] = botIndex[i];
+			OwnerIndexMap[p.name] = i;
 			OwnerTeamMap[p.name] = p.team == 1 ? "orange" : "blue";
 		}
 		else {
@@ -391,7 +394,7 @@ void Mugi::tickPlayer(std::string actorName) {
 		//空白でもcountに引っかからないはず...
 		//send FOCUS
 		if (OwnerIndexMap.count(actorName) != 0) {
-			cvarManager->log(actorName);
+			//cvarManager->log(actorName);
 			json root;
 			json j;
 			root["cmd"] = "player";
