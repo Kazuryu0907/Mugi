@@ -108,14 +108,20 @@ void Mugi::startGame(std::string eventName) {
 	createNameTable(false);
 	isBoostWatching = true;
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
+	std::string matchId = sw.GetMatchGUID();
+	json root,j;
+	root["cmd"] = "matchId";
+	j["matchId"] = matchId;
+	root["data"] = j;
+	sendSocket(root.dump());
 	if (sw.IsNull())return;
 	//only run first
 	cvarManager->log("getTOtal:" + TOS(sw.GetTotalScore()));
 	if (sw.GetTotalScore() == 0) {
 		resetSetPoint(sw);
 	}
-	json root;
 	root["cmd"] = "start";
+	root["data"] = 0;
 	if (sw.GetTotalScore() == 0)sendSocket(root.dump());
 }
 
@@ -161,16 +167,17 @@ void Mugi::calcSetPoint(ServerWrapper sw) {
 
 
 void Mugi::endGame(std::string eventName) {
+
 	isBoostWatching = false;
+
+	ServerWrapper sw = gameWrapper->GetOnlineGame();
+	if (sw.IsNull())return;
+	//setPoint
+	calcSetPoint(sw);
+	//勝利mv流すため，この順番
 	json root;
 	root["cmd"] = "end";
 	sendSocket(root.dump());
-	ServerWrapper sw = gameWrapper->GetOnlineGame();
-	if (sw.IsNull())return;
-
-	//setPoint
-	calcSetPoint(sw);
-
 	std::vector<json> Stats;
 	ArrayWrapper<PriWrapper> pls = sw.GetPRIs();
 	cvarManager->log(TOS(sw.GetMatchWinner().GetScore()));
@@ -218,7 +225,7 @@ void Mugi::onGoal(ActorWrapper caller) {
 		assisterId = assistPl.GetbBot() ? botId2Id[assistPl.GetOldName().ToString()] : split(assistPl.GetUniqueIdWrapper().GetIdString());
 	}
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
-
+	cvarManager->log("0score" + TOS(sw.GetTeams().Get(0).GetScore()));
 	json j;
 	j["team"] = team == 0 ? "blue" : "orange";
 	j["scoreId"] = scorerId;
@@ -240,6 +247,8 @@ void Mugi::createNameTable(bool isForcedRun)
 	ArrayWrapper<CarWrapper> cars = sw.GetCars();
 	//only run first or onload
 	if (!isForcedRun && sw.GetTotalScore() != 0)return;
+	json _j; _j["cmd"] = "start";
+	if (isForcedRun)sendSocket(_j.dump());
 	cvarManager->log("PLS:" + TOS(pls.Count()));
 
 	//-----clear------//
@@ -292,6 +301,10 @@ void Mugi::createNameTable(bool isForcedRun)
 		DisplayName2Id[displayName] = playerId;
 		Id2DisplayName[playerId] = displayName;
 		cvarManager->log(":=" + playerId+":"+TOS(pl.GetTeamNum()));
+		json root;
+		root["cmd"] = "dbg";
+		root["data"] = playerId;
+		sendSocket(root.dump());
 		if (pl.GetTeamNum() != 255) {//not �ϐ��
 			playerData p = { displayName,playerId ,pl.GetTeamNum() };//isblue
 			OwnerMap.push_back(p);
@@ -329,7 +342,7 @@ void Mugi::updateTime(std::string eventName)
 	if (sw.IsNull())return;
 	json root;
 	root["cmd"] = "time";
-	int time = sw.GetbOverTime() ? sw.GetOvertimeTimePlayed() : sw.GetSecondsRemaining();
+	int time = sw.GetbOverTime() ? int(sw.GetOvertimeTimePlayed()) : sw.GetSecondsRemaining();
 	root["data"] = time;
 	sendSocket(root.dump());
 }
