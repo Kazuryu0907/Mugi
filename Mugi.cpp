@@ -108,13 +108,14 @@ void Mugi::startGame(std::string eventName) {
 	createNameTable(false);
 	isBoostWatching = true;
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
+	if (sw.IsNull())return;
 	std::string matchId = sw.GetMatchGUID();
 	json root,j;
 	root["cmd"] = "matchId";
 	j["matchId"] = matchId;
 	root["data"] = j;
 	sendSocket(root.dump());
-	if (sw.IsNull())return;
+	
 	//only run first
 	cvarManager->log("getTOtal:" + TOS(sw.GetTotalScore()));
 	if (sw.GetTotalScore() == 0) {
