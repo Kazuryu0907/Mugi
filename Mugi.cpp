@@ -110,6 +110,8 @@ void Mugi::startGame(std::string eventName) {
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
 	if (sw.IsNull())return;
 	std::string matchId = sw.GetMatchGUID();
+	//+4はマジックナンバー　試合開始からカウント開始までの時間
+	if (sw.GetbOverTime())overtimeOffset = int(sw.GetSecondsElapsed()) + 4;
 	json root,j;
 	root["cmd"] = "matchId";
 	j["matchId"] = matchId;
@@ -341,10 +343,12 @@ void Mugi::updateTime(std::string eventName)
 {
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
 	if (sw.IsNull())return;
-	json root;
+	json root,j;
 	root["cmd"] = "time";
-	int time = sw.GetbOverTime() ? int(sw.GetOvertimeTimePlayed()) : sw.GetSecondsRemaining();
-	root["data"] = time;
+	int time = sw.GetbOverTime() ? int(sw.GetSecondsElapsed()) - overtimeOffset : sw.GetSecondsRemaining();
+	j["time"] = time;
+	j["isOvertime"] = sw.GetbOverTime();
+	root["data"] = j;
 	sendSocket(root.dump());
 }
 
