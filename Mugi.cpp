@@ -345,7 +345,8 @@ void Mugi::updateTime(std::string eventName)
 	if (sw.IsNull())return;
 	json root,j;
 	root["cmd"] = "time";
-	int time = sw.GetbOverTime() ? int(sw.GetSecondsElapsed()) - overtimeOffset : sw.GetSecondsRemaining();
+	//overtimeOffsetの値setのタイミングと合わせるため，GetbOvertime()から変更
+	int time = overtimeOffset == 0 ? int(sw.GetSecondsElapsed()) - overtimeOffset : sw.GetSecondsRemaining();
 	j["time"] = time;
 	j["isOvertime"] = sw.GetbOverTime();
 	root["data"] = j;

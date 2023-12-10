@@ -87,6 +87,7 @@ private:
 	std::string preAutoCamActorName = "";
 	std::string currentFocusActorName = "";
 	std::string preFocusActorName = "";
+	int overtimeOffset = 0;
 	int preFocusActorScore = 0;
 	int dst_socket;
 	std::string preMsg = "";
