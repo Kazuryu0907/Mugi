@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "Mugi.h"
-#include <nlohmann/json.hpp>
+#include "nlohmann/json.hpp"
 
 #define TOS(i) std::to_string(i)
 
@@ -248,6 +248,8 @@ void Mugi::createNameTable(bool isForcedRun)
 	if (sw.IsNull())return;
 	ArrayWrapper<PriWrapper> pls = sw.GetPRIs();
 	ArrayWrapper<CarWrapper> cars = sw.GetCars();
+	ArrayWrapper<ControllerWrapper> players = sw.GetPlayers();
+	
 	//only run first or onload
 	if (!isForcedRun && sw.GetTotalScore() != 0)return;
 	json _j; _j["cmd"] = "start";
