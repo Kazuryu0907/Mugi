@@ -52,6 +52,31 @@ void Mugi::onLoad()
 		root["cmd"] = "endStats";
 		sendSocket(root.dump());
 		});
+
+	// To Get TeamNames
+	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.ShowSeasonIntroScene", [this](std::string eventname) {
+		cvarManager->log("Show SeasonIntroScene");
+		ServerWrapper sw = gameWrapper->GetOnlineGame();
+		if (sw.IsNull())return;
+		std::string matchId = sw.GetMatchGUID();
+		// if room change
+		if (preMatchId != matchId) {
+			auto teams = sw.GetTeams();
+			// Send TeamNames
+			std::string blueTeamName = teams.Get(0).GetCustomTeamName().ToString();
+			std::string orangeTeamName = teams.Get(1).GetCustomTeamName().ToString();
+			json root, j;
+			root["cmd"] = "teamNames";
+			j["blue"] = blueTeamName;
+			j["orange"] = orangeTeamName;
+			j["matchId"] = matchId;
+			root["data"] = j;
+			sendSocket(root.dump());
+
+			cvarManager->log("roomID:" + matchId + " blue:" + blueTeamName + " orange:" + orangeTeamName);
+			preMatchId = matchId;
+		}
+		});
 	//Function TAGame.GameEvent_Soccar_TA.EventPlayerScored
 	//Function GameFramework.GameThirdPersonCamera.GetFocusActor
 	//
@@ -95,15 +120,18 @@ bool Mugi::sendSocket(std::string str) {
 	bool res = send(sock, str.c_str(), str.length(), 0);
 	return res;
 }
+
 void Mugi::endSocket() {
 	closesocket(dst_socket);
 	WSACleanup();
 }
+
 void Mugi::scored(std::string eventName) {
 	json root;
 	root["cmd"] = "scored";
 	sendSocket(root.dump());
 }
+
 void Mugi::startGame(std::string eventName) {
 	createNameTable(false);
 	isBoostWatching = true;
@@ -121,62 +149,22 @@ void Mugi::startGame(std::string eventName) {
 	//only run first
 	cvarManager->log("getTOtal:" + TOS(sw.GetTotalScore()));
 	if (sw.GetTotalScore() == 0) {
-		resetSetPoint(sw);
+		//resetSetPoint(sw);
 	}
 	root["cmd"] = "start";
 	root["data"] = 0;
 	if (sw.GetTotalScore() == 0)sendSocket(root.dump());
 }
 
-void Mugi::resetSetPoint(ServerWrapper sw) {
-	std::string blueTeamName = sw.GetTeams().Get(0).GetCustomTeamName().ToString();
-	std::string orangeTeamName = sw.GetTeams().Get(1).GetCustomTeamName().ToString();
-	cvarManager->log(blueTeamName+":"+preTeamName.blue);
-	cvarManager->log(orangeTeamName + ":" + preTeamName.orange);
-	if (preTeamName.blue != blueTeamName || preTeamName.orange != orangeTeamName) {
-		//別部屋のとき
-		json root; json j;
-		root["cmd"] = "setPoint";
-		currentSetPoint.blue = 0; currentSetPoint.orange = 0;
-		j["blue"] = 0; j["orange"] = 0;
-		root["data"] = j;
-		sendSocket(root.dump());
-		//試合終了後カウントさせるため，代入
-		preTeamName.blue = blueTeamName;
-		preTeamName.orange = orangeTeamName;
-	}
-}
-
-void Mugi::calcSetPoint(ServerWrapper sw) {
-	json root;
-	root["cmd"] = "setPoint";
-	std::string blueTeamName = sw.GetTeams().Get(0).GetCustomTeamName().ToString();
-	std::string orangeTeamName = sw.GetTeams().Get(1).GetCustomTeamName().ToString();
-	if (preTeamName.blue == blueTeamName && preTeamName.orange == orangeTeamName) {
-		//Match続行
-		int winnerTeamIndex = sw.GetGameWinner().GetTeamNum();//0 => blue
-		//setPoint加算
-		if (winnerTeamIndex == 0)currentSetPoint.blue++;
-		else currentSetPoint.orange++;
-	}
-	json j;
-	j["blue"] = currentSetPoint.blue;
-	j["orange"] = currentSetPoint.orange;
-	root["data"] = j;
-	sendSocket(root.dump());
-
-	preTeamName.blue = blueTeamName; preTeamName.orange = orangeTeamName;
-}
 
 
 void Mugi::endGame(std::string eventName) {
-
 	isBoostWatching = false;
 
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
 	if (sw.IsNull())return;
 	//setPoint
-	calcSetPoint(sw);
+	//calcSetPoint(sw);
 	//勝利mv流すため，この順番
 	json root;
 	root["cmd"] = "end";

@@ -34,8 +34,9 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	void onGoal(ActorWrapper caller);
 	void initSocket();
 	void endSocket();
-	void calcSetPoint(ServerWrapper sw);
-	void resetSetPoint(ServerWrapper sw);
+//	void calcSetPoint(ServerWrapper sw);
+//	void resetSetPoint(ServerWrapper sw);
+	void sendTeamNames(ServerWrapper);
 	bool sendSocket(std::string);
 	void endGame(std::string);
 
@@ -73,6 +74,7 @@ private:
 	std::unordered_map<std::string, std::string> OwnerTeamMap;
 	struct s_currentSetPoint currentSetPoint;
 	struct s_preTeamName preTeamName;
+	std::string preMatchId;
 
 	int Boosts[10];
 	int botIndex[6] = { 0,0,0,0,0,0 };
