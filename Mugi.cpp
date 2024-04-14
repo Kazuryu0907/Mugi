@@ -55,12 +55,12 @@ void Mugi::onLoad()
 
 	// To Get TeamNames
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.ShowSeasonIntroScene", [this](std::string eventname) {
-		cvarManager->log("Show SeasonIntroScene");
 		ServerWrapper sw = gameWrapper->GetOnlineGame();
 		if (sw.IsNull())return;
 		std::string matchId = sw.GetMatchGUID();
 		// if room change
 		if (preMatchId != matchId) {
+			cvarManager->log("Show SeasonIntroScene");
 			auto teams = sw.GetTeams();
 			// Send TeamNames
 			std::string blueTeamName = teams.Get(0).GetCustomTeamName().ToString();
@@ -165,6 +165,8 @@ void Mugi::endGame(std::string eventName) {
 	if (sw.IsNull())return;
 	//setPoint
 	//calcSetPoint(sw);
+	//0にしとかないと次のMatchのtimeがバグる
+	overtimeOffset = 0;
 	//勝利mv流すため，この順番
 	json root;
 	root["cmd"] = "end";
@@ -336,7 +338,7 @@ void Mugi::updateTime(std::string eventName)
 	json root,j;
 	root["cmd"] = "time";
 	//overtimeOffsetの値setのタイミングと合わせるため，GetbOvertime()から変更
-	int time = overtimeOffset == 0 ? int(sw.GetSecondsElapsed()) - overtimeOffset : sw.GetSecondsRemaining();
+	int time = overtimeOffset == 0 ? sw.GetSecondsRemaining() : int(sw.GetSecondsElapsed()) - overtimeOffset ;
 	j["time"] = time;
 	j["isOvertime"] = sw.GetbOverTime();
 	root["data"] = j;
