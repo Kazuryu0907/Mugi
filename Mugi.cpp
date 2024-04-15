@@ -44,6 +44,7 @@ void Mugi::onLoad()
 		if (attacker.IsNull())return;
 		std::string attackerName = "Player_" + attacker.GetOwnerName();//player�̂ݍl��
 		if (OwnerIndexMap.count(attackerName) != 0) {
+			cvarManager->log(attackerName);
 			// sendSocket("?d:" + TOS(OwnerIndexMap[attackerName]));//demo
 		}
 		});
@@ -76,6 +77,46 @@ void Mugi::onLoad()
 			cvarManager->log("roomID:" + matchId + " blue:" + blueTeamName + " orange:" + orangeTeamName);
 			preMatchId = matchId;
 		}
+		});
+
+	gameWrapper->HookEventWithCallerPost<ServerWrapper>("Function TAGame.GFxHUD_TA.HandleStatTickerMessage",
+		[this](ServerWrapper caller, void* params, std::string eventname) {
+			struct StatTickerParams {
+				uintptr_t Receiver;
+				uintptr_t Victim;
+				uintptr_t StatEvent;
+			};
+
+			StatTickerParams* pStruct = (StatTickerParams*)params;
+			PriWrapper receiver = PriWrapper(pStruct->Receiver);
+			PriWrapper victim = PriWrapper(pStruct->Victim);
+			StatEventWrapper statEvent = StatEventWrapper(pStruct->StatEvent);
+
+			if (statEvent.GetEventName() == "Demolish") {
+				cvarManager->log("!!demolished by ");
+				if (!receiver) { cvarManager->log("receiver is Null"); return; }
+				if (!victim) { cvarManager->log("victim is Null"); return; }
+				//観戦時のプレイヤー名に合わせるため
+				int receiverIndex, victimIndex;
+				std::string receiverDisplayName, victimDisplayName;
+				if(isDebug){
+					if (receiver.GetbBot())receiverDisplayName = "Player_Bot_" + receiver.GetOldName().ToString();
+					if (victim.GetbBot())victimDisplayName = "Player_Bot_" + victim.GetOldName().ToString();
+					receiverIndex = OwnerIndexMap[receiverDisplayName];
+					victimIndex = OwnerIndexMap[victimDisplayName];
+				} else {
+					receiverIndex = OwnerIndexMap[split("Player_" + receiver.GetUniqueIdWrapper().GetIdString())];
+					victimIndex = OwnerIndexMap[split("Player_" + victim.GetUniqueIdWrapper().GetIdString())];
+				}
+
+				cvarManager->log("receiver:" + TOS(receiverIndex) + " victim:" + TOS(victimIndex));
+				json root, j;
+				root["cmd"] = "demolished";
+				j["receiverIndex"] = receiverIndex;
+				j["victimIndex"] = victimIndex;
+				root["data"] = j;
+				sendSocket(root.dump());
+			}
 		});
 	//Function TAGame.GameEvent_Soccar_TA.EventPlayerScored
 	//Function GameFramework.GameThirdPersonCamera.GetFocusActor
