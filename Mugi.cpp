@@ -297,6 +297,7 @@ void Mugi::createNameTable(bool isForcedRun)
 	int botBlueNum = 0;
 	int botOrangeNum = 0;
 	int botCount = 0;
+	std::vector<std::string> DisplayNames;
 	
 	for (int i = 0; i < pls.Count(); i++) {
 		cvarManager->log("---------");
@@ -329,6 +330,7 @@ void Mugi::createNameTable(bool isForcedRun)
 		if (pl.GetbBot())displayName = "Player_Bot_" + pl.GetOldName().ToString();
 		else			 displayName = pl.GetPlayerName().ToString();
 		cvarManager->log(displayName);
+		
 		auto ppl = std::make_shared<PriWrapper>(pl);
 
 		if (pl.GetbBot())PlayerMap[displayName] = ppl;
@@ -343,10 +345,12 @@ void Mugi::createNameTable(bool isForcedRun)
 		sendSocket(root.dump());
 		if (pl.GetTeamNum() != 255) {//not �ϐ��
 			playerData p = { displayName,playerId ,pl.GetTeamNum() };//isblue
+			
 			OwnerMap.push_back(p);
 		}
 
 	}
+
 	//�`�[����sort
 	//koujun ni henkou
 	std::sort(OwnerMap.begin(), OwnerMap.end(), [](const playerData& a, const playerData& b) {return(a.team < b.team); });
@@ -365,8 +369,13 @@ void Mugi::createNameTable(bool isForcedRun)
 		//後々p.nameからidに代わる予定
 		if (isDebug) PlayerIndexs.push_back(TOS(i));
 		else PlayerIndexs.push_back(p.id);
+		DisplayNames.push_back(p.name);
 	}
 	json root;
+	root["cmd"] = "displayNames";
+	root["data"] = DisplayNames;
+	sendSocket(root.dump());
+	//json root;
 	root["cmd"] = "playerTable";
 	root["data"] = PlayerIndexs;
 	sendSocket(root.dump());
