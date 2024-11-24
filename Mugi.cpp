@@ -44,6 +44,7 @@ void Mugi::onLoad()
 		if (attacker.IsNull())return;
 		std::string attackerName = "Player_" + attacker.GetOwnerName();//player�̂ݍl��
 		if (OwnerIndexMap.count(attackerName) != 0) {
+			cvarManager->log(attackerName);
 			// sendSocket("?d:" + TOS(OwnerIndexMap[attackerName]));//demo
 		}
 		});
@@ -76,6 +77,46 @@ void Mugi::onLoad()
 			cvarManager->log("roomID:" + matchId + " blue:" + blueTeamName + " orange:" + orangeTeamName);
 			preMatchId = matchId;
 		}
+		});
+
+	gameWrapper->HookEventWithCallerPost<ServerWrapper>("Function TAGame.GFxHUD_TA.HandleStatTickerMessage",
+		[this](ServerWrapper caller, void* params, std::string eventname) {
+			struct StatTickerParams {
+				uintptr_t Receiver;
+				uintptr_t Victim;
+				uintptr_t StatEvent;
+			};
+
+			StatTickerParams* pStruct = (StatTickerParams*)params;
+			PriWrapper receiver = PriWrapper(pStruct->Receiver);
+			PriWrapper victim = PriWrapper(pStruct->Victim);
+			StatEventWrapper statEvent = StatEventWrapper(pStruct->StatEvent);
+
+			if (statEvent.GetEventName() == "Demolish") {
+				cvarManager->log("!!demolished by ");
+				if (!receiver) { cvarManager->log("receiver is Null"); return; }
+				if (!victim) { cvarManager->log("victim is Null"); return; }
+				//観戦時のプレイヤー名に合わせるため
+				int receiverIndex, victimIndex;
+				std::string receiverDisplayName, victimDisplayName;
+				if(isDebug){
+					if (receiver.GetbBot())receiverDisplayName = "Player_Bot_" + receiver.GetOldName().ToString();
+					if (victim.GetbBot())victimDisplayName = "Player_Bot_" + victim.GetOldName().ToString();
+					receiverIndex = OwnerIndexMap[receiverDisplayName];
+					victimIndex = OwnerIndexMap[victimDisplayName];
+				} else {
+					receiverIndex = OwnerIndexMap[split("Player_" + receiver.GetUniqueIdWrapper().GetIdString())];
+					victimIndex = OwnerIndexMap[split("Player_" + victim.GetUniqueIdWrapper().GetIdString())];
+				}
+
+				cvarManager->log("receiver:" + TOS(receiverIndex) + " victim:" + TOS(victimIndex));
+				json root, j;
+				root["cmd"] = "demolished";
+				j["receiverIndex"] = receiverIndex;
+				j["victimIndex"] = victimIndex;
+				root["data"] = j;
+				sendSocket(root.dump());
+			}
 		});
 	//Function TAGame.GameEvent_Soccar_TA.EventPlayerScored
 	//Function GameFramework.GameThirdPersonCamera.GetFocusActor
@@ -256,6 +297,7 @@ void Mugi::createNameTable(bool isForcedRun)
 	int botBlueNum = 0;
 	int botOrangeNum = 0;
 	int botCount = 0;
+	std::vector<std::string> DisplayNames;
 	
 	for (int i = 0; i < pls.Count(); i++) {
 		cvarManager->log("---------");
@@ -288,6 +330,7 @@ void Mugi::createNameTable(bool isForcedRun)
 		if (pl.GetbBot())displayName = "Player_Bot_" + pl.GetOldName().ToString();
 		else			 displayName = pl.GetPlayerName().ToString();
 		cvarManager->log(displayName);
+		
 		auto ppl = std::make_shared<PriWrapper>(pl);
 
 		if (pl.GetbBot())PlayerMap[displayName] = ppl;
@@ -302,10 +345,12 @@ void Mugi::createNameTable(bool isForcedRun)
 		sendSocket(root.dump());
 		if (pl.GetTeamNum() != 255) {//not �ϐ��
 			playerData p = { displayName,playerId ,pl.GetTeamNum() };//isblue
+			
 			OwnerMap.push_back(p);
 		}
 
 	}
+
 	//�`�[����sort
 	//koujun ni henkou
 	std::sort(OwnerMap.begin(), OwnerMap.end(), [](const playerData& a, const playerData& b) {return(a.team < b.team); });
@@ -324,8 +369,13 @@ void Mugi::createNameTable(bool isForcedRun)
 		//後々p.nameからidに代わる予定
 		if (isDebug) PlayerIndexs.push_back(TOS(i));
 		else PlayerIndexs.push_back(p.id);
+		DisplayNames.push_back(p.name);
 	}
 	json root;
+	root["cmd"] = "displayNames";
+	root["data"] = DisplayNames;
+	sendSocket(root.dump());
+	//json root;
 	root["cmd"] = "playerTable";
 	root["data"] = PlayerIndexs;
 	sendSocket(root.dump());
