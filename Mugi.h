@@ -23,6 +23,7 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	virtual void onLoad();
 	virtual void onUnload();
 
+	void onStatEvent(ServerWrapper caller, void* args);
 	void createNameTable(bool);
 	void updateTime(std::string);
 	void startGame(std::string);
@@ -67,6 +68,12 @@ private:
 	struct s_preTeamName {
 		std::string blue = "";
 		std::string orange = "";
+	};
+	struct StatEventStruct {
+		uintptr_t PRI;
+		uintptr_t StatEvent;
+		// Count always is int_max. No idea why
+		uintptr_t Count;
 	};
 	std::string preSubScore;
 	std::vector<playerData> OwnerMap;

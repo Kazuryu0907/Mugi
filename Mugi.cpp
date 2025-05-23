@@ -24,6 +24,7 @@ void Mugi::onLoad()
 	gameWrapper->HookEvent("Function GameEvent_Soccar_TA.Active.BeginState", std::bind(&Mugi::startGame, this, std::placeholders::_1));
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.EventPlayerScored", std::bind(&Mugi::scored, this, std::placeholders::_1));
 	gameWrapper->HookEventWithCallerPost<ActorWrapper>("Function TAGame.ReplayDirector_TA.OnScoreDataChanged", std::bind(&Mugi::onGoal, this, std::placeholders::_1));
+	gameWrapper->HookEventWithCallerPost<ServerWrapper>("Function TAGame.GFxHUD_TA.HandleStatEvent", std::bind(&Mugi::onStatEvent, this, std::placeholders::_1, std::placeholders::_2));
 
 	struct DemolishData {
 		uintptr_t attacker;
@@ -131,15 +132,37 @@ void Mugi::onLoad()
 }
 
 
+
 void Mugi::onUnload()
 {
 	endSocket();
+	gameWrapper->UnhookEvent("Function TAGame.GameEvent_Soccar_TA.OnGameTimeUpdated");
+	gameWrapper->UnhookEvent("Function TAGame.GameEvent_Soccar_TA.EventMatchEnded");
 	gameWrapper->UnhookEvent("Function TAGame.ReplayDirector_TA.Tick");
-	gameWrapper->UnhookEvent("Function TAGame.Camera_Replay_TA.SetFocusActor");
-	gameWrapper->UnhookEvent("Function TAGame.Camera_TA.OnViewTargetChanged");
-	//Function GameEvent_Soccar_TA.Active.StartRound
 	gameWrapper->UnhookEvent("Function GameEvent_Soccar_TA.Active.BeginState");
 	gameWrapper->UnhookEvent("Function TAGame.GameEvent_Soccar_TA.EventPlayerScored");
+	gameWrapper->UnhookEvent("Function TAGame.ReplayDirector_TA.OnScoreDataChanged");
+	gameWrapper->UnhookEvent("Function TAGame.GFxHUD_TA.HandleStatEvent");
+	
+	gameWrapper->UnhookEvent("Function GameEvent_Soccar_TA.ReplayPlayback.EndState");
+	gameWrapper->UnhookEvent("Function TAGame.GameEvent_TA.OnReplicatedDemolish");
+	gameWrapper->UnhookEvent("Function ReplayDirector_TA.PlayingHighlights.PlayRandomHighlight");
+	gameWrapper->UnhookEvent("Function TAGame.GameEvent_Soccar_TA.ShowSeasonIntroScene");
+	gameWrapper->UnhookEvent("Function TAGame.GFxHUD_TA.HandleStatTickerMessage");
+}
+
+void Mugi::onStatEvent(ServerWrapper caller, void* args){
+	auto tArgs = (StatEventStruct*)args;
+
+	auto statEvent = StatEventWrapper(tArgs->StatEvent);
+	std::string eventString = statEvent.GetEventName();
+   // https://github.com/sruon/bakelite/blob/efb0eb7be2a13c7d8764a2b88609b57c6cb31e15/source/bakelite.cpp#L300
+	if (eventString == "EpicSave") {
+		json root;
+		root["cmd"] = "epicSave";
+		sendSocket(root.dump());
+		cvarManager->log("onStatEvent:" + eventString);
+	}
 }
 
 void Mugi::initSocket() {
