@@ -70,10 +70,10 @@ private:
 		std::string orange = "";
 	};
 	struct StatEventStruct {
-		uintptr_t PRI;
+		uintptr_t Receiver;
+		uintptr_t Victim;
 		uintptr_t StatEvent;
 		// Count always is int_max. No idea why
-		uintptr_t Count;
 	};
 	std::string preSubScore;
 	std::vector<playerData> OwnerMap;
