@@ -29,6 +29,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Clone bakkesmodplugin.h
+      run: |
+        git --version
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.0.2
