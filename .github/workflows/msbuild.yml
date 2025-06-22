@@ -34,6 +34,7 @@ jobs:
         curl.exe -OL https://github.com/bakkesmodorg/BakkesModInjectorCpp/releases/latest/download/BakkesModSetup.zip
         tar -xf BakkesModSetup.zip
         Start-Process -FilePath ".\BakkesModSetup.exe" -ArgumentList "/S" -Wait -NoNewWindow
+      shell: powershell
     - name: Clone bakkesmodplugin.h
       run: |
         git clone https://github.com/bakkesmodorg/BakkesModSDK.git /bakkesmodsdk
