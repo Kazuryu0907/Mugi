@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "Mugi.h"
 #include "nlohmann/json.hpp"
+#include <chrono>
 
 #define TOS(i) std::to_string(i)
 
@@ -15,6 +16,8 @@ void Mugi::onLoad()
 	initSocket();
 	json root;
 	root["cmd"] = "init";
+	root["data"]["version"] = plugin_version;
+	root["data"]["receiverEnabled"] = true;
 	sendSocket(root.dump());
 	createNameTable(true);
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.OnGameTimeUpdated", std::bind(&Mugi::updateTime, this, std::placeholders::_1));
@@ -194,8 +197,18 @@ void Mugi::initSocket() {
 		return;
 	}
 	
-	if (connect(sock, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
-		cvarManager->log("Connect failed with error: " + std::to_string(WSAGetLastError()));
+	// Bind socket for receiving
+	if (bind(sock, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
+		cvarManager->log("Bind failed with error: " + std::to_string(WSAGetLastError()));
+		closesocket(sock);
+		WSACleanup();
+		return;
+	}
+	
+	// Set socket to non-blocking mode for receive operations
+	u_long mode = 1;
+	if (ioctlsocket(sock, FIONBIO, &mode) == SOCKET_ERROR) {
+		cvarManager->log("Setting non-blocking mode failed: " + std::to_string(WSAGetLastError()));
 		closesocket(sock);
 		WSACleanup();
 		return;
@@ -203,6 +216,8 @@ void Mugi::initSocket() {
 	
 	isSocketInitialized = true;
 	cvarManager->log("Socket initialized successfully");
+	
+	startReceiver();
 }
 
 bool Mugi::sendSocket(std::string str) {
@@ -211,7 +226,14 @@ bool Mugi::sendSocket(std::string str) {
 		return false;
 	}
 	
-	int result = send(sock, str.c_str(), str.length(), 0);
+	// For UDP, we need to use sendto with destination address
+	struct sockaddr_in destAddr;
+	destAddr.sin_family = AF_INET;
+	destAddr.sin_port = htons(PORT);
+	inet_pton(AF_INET, ADDR.c_str(), &destAddr.sin_addr.s_addr);
+	
+	int result = sendto(sock, str.c_str(), str.length(), 0, 
+						(struct sockaddr*)&destAddr, sizeof(destAddr));
 	if (result == SOCKET_ERROR) {
 		cvarManager->log("Socket send error: " + std::to_string(WSAGetLastError()));
 		return false;
@@ -221,6 +243,7 @@ bool Mugi::sendSocket(std::string str) {
 
 void Mugi::endSocket() {
 	if (isSocketInitialized) {
+		stopReceiver();
 		closesocket(sock);
 		WSACleanup();
 		isSocketInitialized = false;
@@ -564,4 +587,99 @@ std::string Mugi::split(const std::string& s) {
 	}
 	if (elems.size() != 3)return "";
 	return elems[1];
+}
+
+void Mugi::startReceiver() {
+	isReceiving = true;
+	receiverThread = std::thread(&Mugi::receiveLoop, this);
+	cvarManager->log("Receiver thread started");
+}
+
+void Mugi::stopReceiver() {
+	isReceiving = false;
+	if (receiverThread.joinable()) {
+		receiverThread.join();
+		cvarManager->log("Receiver thread stopped");
+	}
+}
+
+void Mugi::receiveLoop() {
+	char buffer[1024];
+	struct sockaddr_in clientAddr;
+	int clientAddrLen = sizeof(clientAddr);
+	
+	while (isReceiving) {
+		int bytesReceived = recvfrom(sock, buffer, sizeof(buffer) - 1, 0, 
+									(struct sockaddr*)&clientAddr, &clientAddrLen);
+		
+		if (bytesReceived > 0) {
+			buffer[bytesReceived] = '\0';
+			std::string command(buffer);
+			processCommand(command);
+		}
+		else if (bytesReceived == SOCKET_ERROR) {
+			int error = WSAGetLastError();
+			if (error != WSAEWOULDBLOCK && isReceiving) {
+				cvarManager->log("Receive error: " + std::to_string(error));
+			}
+		}
+		
+		// Small delay to prevent busy waiting
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+}
+
+void Mugi::processCommand(const std::string& command) {
+	try {
+		json request = json::parse(command);
+		
+		if (!request.contains("cmd")) {
+			cvarManager->log("Invalid command: missing 'cmd' field");
+			return;
+		}
+		
+		std::string cmd = request["cmd"];
+		cvarManager->log("Received command: " + cmd);
+		
+		if (cmd == "getVersion") {
+			json response;
+			response["cmd"] = "version";
+			response["data"]["version"] = plugin_version;
+			response["data"]["status"] = "ok";
+			response["data"]["buildTime"] = __DATE__ " " __TIME__;
+			
+			sendSocket(response.dump());
+			cvarManager->log("Version info sent: " + std::string(plugin_version));
+		}
+		else if (cmd == "ping") {
+			json response;
+			response["cmd"] = "pong";
+			response["data"]["status"] = "ok";
+			response["data"]["timestamp"] = std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::system_clock::now().time_since_epoch()).count();
+			
+			sendSocket(response.dump());
+			cvarManager->log("Pong response sent");
+		}
+		else {
+			cvarManager->log("Unknown command: " + cmd);
+			
+			json response;
+			response["cmd"] = "error";
+			response["data"]["message"] = "Unknown command: " + cmd;
+			response["data"]["status"] = "error";
+			
+			sendSocket(response.dump());
+		}
+	}
+	catch (const json::exception& e) {
+		cvarManager->log("JSON parse error: " + std::string(e.what()));
+		
+		json response;
+		response["cmd"] = "error";
+		response["data"]["message"] = "Invalid JSON format";
+		response["data"]["status"] = "error";
+		
+		sendSocket(response.dump());
+	}
 }

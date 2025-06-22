@@ -7,6 +7,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <unordered_map>
+#include <thread>
+#include <atomic>
 
 #include "version.h"
 constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "." stringify(VERSION_BUILD);
@@ -47,6 +49,11 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	void endSocket();
 	bool sendSocket(std::string);
 	void endGame(std::string);
+	
+	void startReceiver();
+	void stopReceiver();
+	void receiveLoop();
+	void processCommand(const std::string& command);
 
 	std::string split(const std::string& s);
 	//std::string split(const std::string& s);
@@ -58,6 +65,9 @@ private:
 	SOCKET sock;
 	struct sockaddr_in server;
 	bool isSocketInitialized = false;
+	
+	std::thread receiverThread;
+	std::atomic<bool> isReceiving;
 	std::unordered_map<std::string, std::shared_ptr<PriWrapper>> PlayerMap;
 	bool isBoostWatching = true;
 	struct playerData {
