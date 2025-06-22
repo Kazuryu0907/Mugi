@@ -33,7 +33,7 @@ jobs:
       run: |
         curl.exe -OL https://github.com/bakkesmodorg/BakkesModInjectorCpp/releases/latest/download/BakkesModSetup.zip
         tar -xf BakkesModSetup.zip
-        dir
+        ./BakkesModSetup.exe /s /v"/qn"
     - name: Clone bakkesmodplugin.h
       run: |
         git clone https://github.com/bakkesmodorg/BakkesModSDK.git /bakkesmodsdk
