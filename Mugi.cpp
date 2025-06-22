@@ -170,26 +170,62 @@ void Mugi::onStatEvent(ServerWrapper caller, void* args){
 void Mugi::initSocket() {
 	WSADATA wsaData;
 	struct sockaddr_in server;
-	cvarManager->log("initilizing socket...");
+	cvarManager->log("initializing socket...");
+	isSocketInitialized = false;
+	
 	if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0) {
-		cvarManager->log("send error");
+		cvarManager->log("WSAStartup failed with error: " + std::to_string(WSAGetLastError()));
 		return;
 	}
+	
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock == INVALID_SOCKET) {
+		cvarManager->log("Socket creation failed with error: " + std::to_string(WSAGetLastError()));
+		WSACleanup();
+		return;
+	}
+	
 	server.sin_family = AF_INET;
 	server.sin_port = htons(PORT);
-	inet_pton(server.sin_family, ADDR.c_str(), &server.sin_addr.s_addr);
-	connect(sock, (struct sockaddr*)&server, sizeof(server));
+	if (inet_pton(server.sin_family, ADDR.c_str(), &server.sin_addr.s_addr) <= 0) {
+		cvarManager->log("Invalid address format: " + ADDR);
+		closesocket(sock);
+		WSACleanup();
+		return;
+	}
+	
+	if (connect(sock, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
+		cvarManager->log("Connect failed with error: " + std::to_string(WSAGetLastError()));
+		closesocket(sock);
+		WSACleanup();
+		return;
+	}
+	
+	isSocketInitialized = true;
+	cvarManager->log("Socket initialized successfully");
 }
 
 bool Mugi::sendSocket(std::string str) {
-	bool res = send(sock, str.c_str(), str.length(), 0);
-	return res;
+	if (!isSocketInitialized) {
+		cvarManager->log("Socket not initialized, cannot send data");
+		return false;
+	}
+	
+	int result = send(sock, str.c_str(), str.length(), 0);
+	if (result == SOCKET_ERROR) {
+		cvarManager->log("Socket send error: " + std::to_string(WSAGetLastError()));
+		return false;
+	}
+	return true;
 }
 
 void Mugi::endSocket() {
-	closesocket(dst_socket);
-	WSACleanup();
+	if (isSocketInitialized) {
+		closesocket(sock);
+		WSACleanup();
+		isSocketInitialized = false;
+		cvarManager->log("Socket closed successfully");
+	}
 }
 
 void Mugi::scored(std::string eventName) {
@@ -204,8 +240,8 @@ void Mugi::startGame(std::string eventName) {
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
 	if (sw.IsNull())return;
 	std::string matchId = sw.GetMatchGUID();
-	//+4はマジックナンバー　試合開始からカウント開始までの時間
-	if (sw.GetbOverTime())overtimeOffset = int(sw.GetSecondsElapsed()) + 4;
+	// Set overtime offset (time from match start to count start)
+	if (sw.GetbOverTime())overtimeOffset = int(sw.GetSecondsElapsed()) + OVERTIME_START_OFFSET;
 	json root,j;
 	root["cmd"] = "matchId";
 	j["matchId"] = matchId;
@@ -246,7 +282,7 @@ void Mugi::endGame(std::string eventName) {
 
 		auto pl = pls.Get(i);
 		if (pl.IsNull())continue;
-		if (pl.GetTeamNum() == 255)continue;
+		if (pl.GetTeamNum() == SPECTATOR_TEAM_NUM)continue;
 
 		if(!isDebug)j["id"] = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
 		else j["id"] = TOS(botIndex[debugIndex]);
@@ -368,7 +404,7 @@ void Mugi::createNameTable(bool isForcedRun)
 		root["cmd"] = "dbg";
 		root["data"] = playerId;
 		sendSocket(root.dump());
-		if (pl.GetTeamNum() != 255) {//not �ϐ��
+		if (pl.GetTeamNum() != SPECTATOR_TEAM_NUM) {//not 観戦者
 			playerData p = { displayName,playerId ,pl.GetTeamNum() };//isblue
 			
 			OwnerMap.push_back(p);
@@ -421,27 +457,33 @@ void Mugi::updateTime(std::string eventName)
 }
 
 void Mugi::tickBoost(ServerWrapper gw) {
-	if (isBoostWatching) {
-		auto cars = gw.GetCars();
-		for (int i = 0; i < cars.Count(); i++) {
-			auto car = cars.Get(i);
-			//!!!!!!!!!----only noBot--!!!!!!!!//
-			std::string playerId = DisplayName2Id[car.GetOwnerName()];
-			if (isDebug)playerId = "Player_Bot_" + car.GetOwnerName();
-			if (car.IsNull())continue;
-			auto boostCom = car.GetBoostComponent();
-			if (boostCom.IsNull())continue;
-			int boost = int(boostCom.GetCurrentBoostAmount() * 100);
-			if (OwnerIndexMap.count(playerId) == 0)continue;
-			json root;
-			json j;
-			j["boost"] = boost;
-			j["index"] = OwnerIndexMap[playerId];
-			root["cmd"] = "boost";
-			root["data"] = j;
-			if (boost != Boosts[i])sendSocket(root.dump());
-			Boosts[i] = boost;
-		}
+	if (!isBoostWatching) return;
+	
+	auto cars = gw.GetCars();
+	for (int i = 0; i < cars.Count(); i++) {
+		auto car = cars.Get(i);
+		if (car.IsNull()) continue;
+		
+		auto boostCom = car.GetBoostComponent();
+		if (boostCom.IsNull()) continue;
+		
+		int boost = int(boostCom.GetCurrentBoostAmount() * 100);
+		
+		// Only process if boost value changed
+		if (boost == Boosts[i]) continue;
+		
+		std::string playerId = isDebug ? "Player_Bot_" + car.GetOwnerName() : DisplayName2Id[car.GetOwnerName()];
+		if (OwnerIndexMap.count(playerId) == 0) continue;
+		
+		// Create and send JSON only when boost changed
+		json root, j;
+		j["boost"] = boost;
+		j["index"] = OwnerIndexMap[playerId];
+		root["cmd"] = "boost";
+		root["data"] = j;
+		sendSocket(root.dump());
+		
+		Boosts[i] = boost;
 	}
 }
 
@@ -501,11 +543,14 @@ void Mugi::tickPlayer(std::string actorName) {
 
 void Mugi::tick(std::string eventName) {
 	auto gw = gameWrapper->GetOnlineGame();
-	if (gw.IsNull())return;
+	if (gw.IsNull()) return;
+	
 	CameraWrapper camera = gameWrapper->GetCamera();
-	std::string actorName = camera.GetFocusActor();
-	if (!isDebug)actorName = split(camera.GetFocusActor());
-	//----------tick------------//
+	std::string focusActorRaw = camera.GetFocusActor();
+	if (focusActorRaw.empty()) return;
+	
+	std::string actorName = isDebug ? focusActorRaw : split(focusActorRaw);
+	
 	tickPlayer(actorName);
 	tickBoost(gw);
 	tickScore(actorName);

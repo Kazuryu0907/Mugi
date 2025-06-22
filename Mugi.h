@@ -11,6 +11,16 @@
 #include "version.h"
 constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "." stringify(VERSION_BUILD);
 
+// Network constants
+constexpr int DEFAULT_PORT = 12345;
+constexpr const char* DEFAULT_ADDRESS = "127.0.0.1";
+
+// Game constants
+constexpr int OVERTIME_START_OFFSET = 4;
+constexpr int MAX_BOOST_SLOTS = 10;
+constexpr int MAX_BOT_COUNT = 6;
+constexpr unsigned char SPECTATOR_TEAM_NUM = 255;
+
 
 class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	//,public SettingsWindowBase // Uncomment if you wanna render your own tab in the settings menu
@@ -46,10 +56,11 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	//void onUnload() override; // Uncomment and implement if you need a unload method
 
 private:
-	int PORT = 12345;
-	std::string ADDR = "127.0.0.1";
+	int PORT = DEFAULT_PORT;
+	std::string ADDR = DEFAULT_ADDRESS;
 	SOCKET sock;
 	struct sockaddr_in server;
+	bool isSocketInitialized;
 	std::unordered_map<std::string, std::shared_ptr<PriWrapper>> PlayerMap;
 	bool isBoostWatching = true;
 	struct playerData {
@@ -83,8 +94,8 @@ private:
 	struct s_preTeamName preTeamName;
 	std::string preMatchId;
 
-	int Boosts[10];
-	int botIndex[6] = { 0,0,0,0,0,0 };
+	int Boosts[MAX_BOOST_SLOTS];
+	int botIndex[MAX_BOT_COUNT] = { 0,0,0,0,0,0 };
 	std::unordered_map<std::string, std::string> botId2Id;
 	std::unordered_map<std::string, std::string> DisplayName2Id;
 	std::unordered_map<std::string, std::string> Id2DisplayName;
@@ -98,7 +109,6 @@ private:
 	std::string preFocusActorName = "";
 	int overtimeOffset = 0;
 	int preFocusActorScore = 0;
-	int dst_socket;
 	std::string preMsg = "";
 	std::string msg = "";
 	bool isSendSocket = true;
