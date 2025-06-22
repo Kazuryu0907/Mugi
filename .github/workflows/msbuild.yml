@@ -31,8 +31,9 @@ jobs:
     - uses: actions/checkout@v4
     - name: Clone bakkesmodplugin.h
       run: |
-        git --version
-
+        git clone https://github.com/bakkesmodorg/BakkesModSDK.git
+        mv .\BakkesModSDK\include\bakkesmod\ ./
+        dir
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.0.2
 
