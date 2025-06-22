@@ -251,7 +251,6 @@ void Mugi::startGame(std::string eventName) {
 	//only run first
 	cvarManager->log("getTOtal:" + TOS(sw.GetTotalScore()));
 	if (sw.GetTotalScore() == 0) {
-		//resetSetPoint(sw);
 	}
 	root["cmd"] = "start";
 	root["data"] = 0;
@@ -265,8 +264,6 @@ void Mugi::endGame(std::string eventName) {
 
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
 	if (sw.IsNull())return;
-	//setPoint
-	//calcSetPoint(sw);
 	//0にしとかないと次のMatchのtimeがバグる
 	overtimeOffset = 0;
 	//勝利mv流すため，この順番
@@ -352,7 +349,6 @@ void Mugi::createNameTable(bool isForcedRun)
 	PlayerMap.clear();
 	OwnerMap.clear();
 	DisplayName2Id.clear();
-	UniqueID2DisplayName.clear();
 	OwnerIndexMap.clear();
 	//----------------//
 	int botBlueNum = 0;

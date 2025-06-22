@@ -45,9 +45,6 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	void onGoal(ActorWrapper caller);
 	void initSocket();
 	void endSocket();
-//	void calcSetPoint(ServerWrapper sw);
-//	void resetSetPoint(ServerWrapper sw);
-	void sendTeamNames(ServerWrapper);
 	bool sendSocket(std::string);
 	void endGame(std::string);
 
@@ -60,7 +57,7 @@ private:
 	std::string ADDR = DEFAULT_ADDRESS;
 	SOCKET sock;
 	struct sockaddr_in server;
-	bool isSocketInitialized;
+	bool isSocketInitialized = false;
 	std::unordered_map<std::string, std::shared_ptr<PriWrapper>> PlayerMap;
 	bool isBoostWatching = true;
 	struct playerData {
@@ -94,23 +91,16 @@ private:
 	struct s_preTeamName preTeamName;
 	std::string preMatchId;
 
-	int Boosts[MAX_BOOST_SLOTS];
+	int Boosts[MAX_BOOST_SLOTS] = {0};
 	int botIndex[MAX_BOT_COUNT] = { 0,0,0,0,0,0 };
 	std::unordered_map<std::string, std::string> botId2Id;
 	std::unordered_map<std::string, std::string> DisplayName2Id;
 	std::unordered_map<std::string, std::string> Id2DisplayName;
-	std::unordered_map<std::string, std::string> Id2DisplayName_debug;
-	std::unordered_map<std::string, std::string> PlayerToDisplayName;
-	std::unordered_map<std::string, std::string> UniqueID2DisplayName;
 	std::string preActorName = "";
 	int currentFocusActorScore = 0;
-	std::string preAutoCamActorName = "";
-	std::string currentFocusActorName = "";
 	std::string preFocusActorName = "";
 	int overtimeOffset = 0;
 	int preFocusActorScore = 0;
-	std::string preMsg = "";
-	std::string msg = "";
 	bool isSendSocket = true;
 	bool isDebug = false;
 
