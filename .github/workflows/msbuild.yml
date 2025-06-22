@@ -33,6 +33,7 @@ jobs:
       run: |
         git clone https://github.com/bakkesmodorg/BakkesModSDK.git
         mv .\BakkesModSDK\include\bakkesmod\ ./
+        mv .\BakkesModSDK\lib\pluginsdk.lib ./
         dir
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.0.2
