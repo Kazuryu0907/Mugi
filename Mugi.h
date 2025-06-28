@@ -63,7 +63,10 @@ private:
 	int PORT = DEFAULT_PORT;
 	std::string ADDR = DEFAULT_ADDRESS;
 	SOCKET sock;
+	SOCKET sock2;
 	struct sockaddr_in server;
+	struct sockaddr_in server2;
+	struct sockaddr_in multicast_addr;
 	bool isSocketInitialized = false;
 	
 	std::thread receiverThread;

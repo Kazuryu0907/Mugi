@@ -2,6 +2,8 @@
 #include "Mugi.h"
 #include "nlohmann/json.hpp"
 #include <chrono>
+#include <winSock2.h>
+#include <ws2tcpip.h>
 
 #define TOS(i) std::to_string(i)
 
@@ -182,7 +184,8 @@ void Mugi::initSocket() {
 	}
 	
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sock == INVALID_SOCKET) {
+	sock2 = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock == INVALID_SOCKET || sock2 == INVALID_SOCKET) {
 		cvarManager->log("Socket creation failed with error: " + std::to_string(WSAGetLastError()));
 		WSACleanup();
 		return;
@@ -190,12 +193,32 @@ void Mugi::initSocket() {
 	
 	server.sin_family = AF_INET;
 	server.sin_port = htons(PORT);
+	// server2
+	server2.sin_family = AF_INET;
+	server2.sin_port = htons(12344);
+	// multi cast
+	// multicast_addr.sin_family = AF_INET;
+	// multicast_addr.sin_port = htons(12346);
+	// multicast_addr.sin_addr.s_addr = inet_addr("239.192.1.2");
+	// const char* multicast_address = "239.1.0.1";
 	if (inet_pton(server.sin_family, ADDR.c_str(), &server.sin_addr.s_addr) <= 0) {
 		cvarManager->log("Invalid address format: " + ADDR);
 		closesocket(sock);
 		WSACleanup();
 		return;
 	}
+	if (inet_pton(server2.sin_family, ADDR.c_str(), &server2.sin_addr.s_addr) <= 0) {
+		cvarManager->log("Invalid address format: " + ADDR);
+		closesocket(sock2);
+		WSACleanup();
+		return;
+	}
+	// if (inet_pton(AF_INET, multicast_address, &multicast_addr.sin_addr) != -1){
+	// 	cvarManager->log("Multicast inet_pton failed: " + std::string(multicast_address));
+	// 	closesocket(sock2);
+	// 	WSACleanup();
+	// 	return;
+	// }
 	
 	// Bind socket for receiving
 	if (bind(sock, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
@@ -205,11 +228,23 @@ void Mugi::initSocket() {
 		return;
 	}
 	
+	if (bind(sock2, (struct sockaddr*)&server2, sizeof(server2)) == SOCKET_ERROR) {
+		cvarManager->log("Bind failed with error: " + std::to_string(WSAGetLastError()));
+		closesocket(sock2);
+		WSACleanup();
+		return;
+	}
 	// Set socket to non-blocking mode for receive operations
 	u_long mode = 1;
 	if (ioctlsocket(sock, FIONBIO, &mode) == SOCKET_ERROR) {
 		cvarManager->log("Setting non-blocking mode failed: " + std::to_string(WSAGetLastError()));
 		closesocket(sock);
+		WSACleanup();
+		return;
+	}
+	if (ioctlsocket(sock2, FIONBIO, &mode) == SOCKET_ERROR) {
+		cvarManager->log("Setting non-blocking mode failed: " + std::to_string(WSAGetLastError()));
+		closesocket(sock2);
 		WSACleanup();
 		return;
 	}
@@ -238,13 +273,32 @@ bool Mugi::sendSocket(std::string str) {
 		cvarManager->log("Socket send error: " + std::to_string(WSAGetLastError()));
 		return false;
 	}
+	// sock2
+	struct sockaddr_in destAddr2;
+	destAddr2.sin_family = AF_INET;
+	destAddr2.sin_port = htons(12344);
+	inet_pton(AF_INET, ADDR.c_str(), &destAddr2.sin_addr.s_addr);
+	
+	int result2 = sendto(sock2, str.c_str(), str.length(), 0, 
+						(struct sockaddr*)&destAddr2, sizeof(destAddr2));
+	if (result2 == SOCKET_ERROR) {
+		cvarManager->log("Socket send error: " + std::to_string(WSAGetLastError()));
+		return false;
+	}
+	// if(sendto(sock2, str.c_str(), str.length(), 0, (sockaddr*)&multicast_addr, sizeof(multicast_addr)) == SOCKET_ERROR) {
+	// 	cvarManager->log("Multicast send error: " + std::to_string(WSAGetLastError()));
+	// 	return false;
+	// }
 	return true;
 }
+
+
 
 void Mugi::endSocket() {
 	if (isSocketInitialized) {
 		stopReceiver();
 		closesocket(sock);
+		closesocket(sock2);
 		WSACleanup();
 		isSocketInitialized = false;
 		cvarManager->log("Socket closed successfully");
