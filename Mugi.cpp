@@ -1,6 +1,9 @@
 ﻿#include "pch.h"
 #include "Mugi.h"
 #include "nlohmann/json.hpp"
+#include <chrono>
+#include <winSock2.h>
+#include <ws2tcpip.h>
 
 #define TOS(i) std::to_string(i)
 
@@ -15,6 +18,8 @@ void Mugi::onLoad()
 	initSocket();
 	json root;
 	root["cmd"] = "init";
+	root["data"]["version"] = plugin_version;
+	root["data"]["receiverEnabled"] = true;
 	sendSocket(root.dump());
 	createNameTable(true);
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.OnGameTimeUpdated", std::bind(&Mugi::updateTime, this, std::placeholders::_1));
@@ -170,26 +175,167 @@ void Mugi::onStatEvent(ServerWrapper caller, void* args){
 void Mugi::initSocket() {
 	WSADATA wsaData;
 	struct sockaddr_in server;
-	cvarManager->log("initilizing socket...");
+	cvarManager->log("initializing socket...");
+	isSocketInitialized = false;
+	
 	if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0) {
-		cvarManager->log("send error");
+		cvarManager->log("WSAStartup failed with error: " + std::to_string(WSAGetLastError()));
 		return;
 	}
+	
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock == INVALID_SOCKET) {
+		cvarManager->log("Socket creation failed with error: " + std::to_string(WSAGetLastError()));
+		WSACleanup();
+		return;
+	}
+	
 	server.sin_family = AF_INET;
 	server.sin_port = htons(PORT);
-	inet_pton(server.sin_family, ADDR.c_str(), &server.sin_addr.s_addr);
-	connect(sock, (struct sockaddr*)&server, sizeof(server));
+	// multi cast
+	// multicast_addr.sin_family = AF_INET;
+	// multicast_addr.sin_port = htons(12346);
+	// multicast_addr.sin_addr.s_addr = inet_addr("239.192.1.2");
+	// const char* multicast_address = "239.1.0.1";
+	if (inet_pton(server.sin_family, ADDR.c_str(), &server.sin_addr.s_addr) <= 0) {
+		cvarManager->log("Invalid address format: " + ADDR);
+		closesocket(sock);
+		WSACleanup();
+		return;
+	}
+	// if (inet_pton(AF_INET, multicast_address, &multicast_addr.sin_addr) != -1){
+	// 	cvarManager->log("Multicast inet_pton failed: " + std::string(multicast_address));
+	// 	closesocket(sock2);
+	// 	WSACleanup();
+	// 	return;
+	// }
+	
+	// Bind socket for receiving
+	if (bind(sock, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
+		cvarManager->log("Bind failed with error: " + std::to_string(WSAGetLastError()));
+		closesocket(sock);
+		WSACleanup();
+		return;
+	}
+	
+	// Set socket to non-blocking mode for receive operations
+	u_long mode = 1;
+	if (ioctlsocket(sock, FIONBIO, &mode) == SOCKET_ERROR) {
+		cvarManager->log("Setting non-blocking mode failed: " + std::to_string(WSAGetLastError()));
+		closesocket(sock);
+		WSACleanup();
+		return;
+	}
+	
+	isSocketInitialized = true;
+	cvarManager->log("Socket initialized successfully");
+	
+	startReceiver();
 }
 
-bool Mugi::sendSocket(std::string str) {
-	bool res = send(sock, str.c_str(), str.length(), 0);
-	return res;
+void Mugi::initSocket2() {
+	WSADATA wsaData;
+	struct sockaddr_in server;
+	cvarManager->log("initializing socket2...");
+	isSocketInitialized2 = false;
+	
+	if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0) {
+		cvarManager->log("WSAStartup failed with error: " + std::to_string(WSAGetLastError()));
+		return;
+	}
+	
+	sock2 = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock2 == INVALID_SOCKET) {
+		cvarManager->log("Socket creation failed with error: " + std::to_string(WSAGetLastError()));
+		WSACleanup();
+		return;
+	}
+	
+	server2.sin_family = AF_INET;
+	server2.sin_port = htons(12344);
+	if (inet_pton(server2.sin_family, ADDR.c_str(), &server2.sin_addr.s_addr) <= 0) {
+		cvarManager->log("Invalid address format: " + ADDR);
+		closesocket(sock2);
+		WSACleanup();
+		return;
+	}
+	
+	// Bind socket for receiving
+	if (bind(sock2, (struct sockaddr*)&server2, sizeof(server2)) == SOCKET_ERROR) {
+		cvarManager->log("Bind failed with error 12344: " + std::to_string(WSAGetLastError()));
+		closesocket(sock2);
+		WSACleanup();
+		return;
+	}
+	// Set socket to non-blocking mode for receive operations
+	u_long mode = 1;
+	if (ioctlsocket(sock2, FIONBIO, &mode) == SOCKET_ERROR) {
+		cvarManager->log("Setting non-blocking mode failed: " + std::to_string(WSAGetLastError()));
+		closesocket(sock2);
+		WSACleanup();
+		return;
+	}
+	
+	isSocketInitialized2 = true;
+	cvarManager->log("Socket2 initialized successfully");
 }
+bool Mugi::sendSocket(std::string str) {
+	if (!isSocketInitialized) {
+		cvarManager->log("Socket not initialized, cannot send data");
+		// return false;
+	}else{
+		// For UDP, we need to use sendto with destination address
+		struct sockaddr_in destAddr;
+		destAddr.sin_family = AF_INET;
+		destAddr.sin_port = htons(PORT);
+		inet_pton(AF_INET, ADDR.c_str(), &destAddr.sin_addr.s_addr);
+		
+		int result = sendto(sock, str.c_str(), str.length(), 0, 
+							(struct sockaddr*)&destAddr, sizeof(destAddr));
+		if (result == SOCKET_ERROR) {
+			cvarManager->log("Socket send error: " + std::to_string(WSAGetLastError()));
+		}
+	}
+	
+	if (!isSocketInitialized2) {
+		cvarManager->log("Socket2 not initialized, cannot send data");
+	}else{
+		// sock2
+		struct sockaddr_in destAddr2;
+		destAddr2.sin_family = AF_INET;
+		destAddr2.sin_port = htons(12344);
+		inet_pton(AF_INET, ADDR.c_str(), &destAddr2.sin_addr.s_addr);
+		
+		int result2 = sendto(sock2, str.c_str(), str.length(), 0, 
+							(struct sockaddr*)&destAddr2, sizeof(destAddr2));
+		if (result2 == SOCKET_ERROR) {
+			cvarManager->log("Socket2 send error: " + std::to_string(WSAGetLastError()));
+			// return false;
+		}
+	}
+	// if(sendto(sock2, str.c_str(), str.length(), 0, (sockaddr*)&multicast_addr, sizeof(multicast_addr)) == SOCKET_ERROR) {
+	// 	cvarManager->log("Multicast send error: " + std::to_string(WSAGetLastError()));
+	// 	return false;
+	// }
+	return true;
+}
+
+
 
 void Mugi::endSocket() {
-	closesocket(dst_socket);
-	WSACleanup();
+	if (isSocketInitialized) {
+		stopReceiver();
+		closesocket(sock);
+		WSACleanup();
+		isSocketInitialized = false;
+		cvarManager->log("Socket closed successfully");
+	}
+	if (isSocketInitialized2) {
+		closesocket(sock2);
+		WSACleanup();
+		isSocketInitialized2 = false;
+		cvarManager->log("Socket2 closed successfully");
+	}
 }
 
 void Mugi::scored(std::string eventName) {
@@ -204,8 +350,8 @@ void Mugi::startGame(std::string eventName) {
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
 	if (sw.IsNull())return;
 	std::string matchId = sw.GetMatchGUID();
-	//+4はマジックナンバー　試合開始からカウント開始までの時間
-	if (sw.GetbOverTime())overtimeOffset = int(sw.GetSecondsElapsed()) + 4;
+	// Set overtime offset (time from match start to count start)
+	if (sw.GetbOverTime())overtimeOffset = int(sw.GetSecondsElapsed()) + OVERTIME_START_OFFSET;
 	json root,j;
 	root["cmd"] = "matchId";
 	j["matchId"] = matchId;
@@ -215,7 +361,6 @@ void Mugi::startGame(std::string eventName) {
 	//only run first
 	cvarManager->log("getTOtal:" + TOS(sw.GetTotalScore()));
 	if (sw.GetTotalScore() == 0) {
-		//resetSetPoint(sw);
 	}
 	root["cmd"] = "start";
 	root["data"] = 0;
@@ -229,8 +374,6 @@ void Mugi::endGame(std::string eventName) {
 
 	ServerWrapper sw = gameWrapper->GetOnlineGame();
 	if (sw.IsNull())return;
-	//setPoint
-	//calcSetPoint(sw);
 	//0にしとかないと次のMatchのtimeがバグる
 	overtimeOffset = 0;
 	//勝利mv流すため，この順番
@@ -246,7 +389,7 @@ void Mugi::endGame(std::string eventName) {
 
 		auto pl = pls.Get(i);
 		if (pl.IsNull())continue;
-		if (pl.GetTeamNum() == 255)continue;
+		if (pl.GetTeamNum() == SPECTATOR_TEAM_NUM)continue;
 
 		if(!isDebug)j["id"] = split("Player_" + pl.GetUniqueIdWrapper().GetIdString());
 		else j["id"] = TOS(botIndex[debugIndex]);
@@ -316,7 +459,6 @@ void Mugi::createNameTable(bool isForcedRun)
 	PlayerMap.clear();
 	OwnerMap.clear();
 	DisplayName2Id.clear();
-	UniqueID2DisplayName.clear();
 	OwnerIndexMap.clear();
 	//----------------//
 	int botBlueNum = 0;
@@ -368,7 +510,7 @@ void Mugi::createNameTable(bool isForcedRun)
 		root["cmd"] = "dbg";
 		root["data"] = playerId;
 		sendSocket(root.dump());
-		if (pl.GetTeamNum() != 255) {//not �ϐ��
+		if (pl.GetTeamNum() != SPECTATOR_TEAM_NUM) {//not 観戦者
 			playerData p = { displayName,playerId ,pl.GetTeamNum() };//isblue
 			
 			OwnerMap.push_back(p);
@@ -421,27 +563,33 @@ void Mugi::updateTime(std::string eventName)
 }
 
 void Mugi::tickBoost(ServerWrapper gw) {
-	if (isBoostWatching) {
-		auto cars = gw.GetCars();
-		for (int i = 0; i < cars.Count(); i++) {
-			auto car = cars.Get(i);
-			//!!!!!!!!!----only noBot--!!!!!!!!//
-			std::string playerId = DisplayName2Id[car.GetOwnerName()];
-			if (isDebug)playerId = "Player_Bot_" + car.GetOwnerName();
-			if (car.IsNull())continue;
-			auto boostCom = car.GetBoostComponent();
-			if (boostCom.IsNull())continue;
-			int boost = int(boostCom.GetCurrentBoostAmount() * 100);
-			if (OwnerIndexMap.count(playerId) == 0)continue;
-			json root;
-			json j;
-			j["boost"] = boost;
-			j["index"] = OwnerIndexMap[playerId];
-			root["cmd"] = "boost";
-			root["data"] = j;
-			if (boost != Boosts[i])sendSocket(root.dump());
-			Boosts[i] = boost;
-		}
+	if (!isBoostWatching) return;
+	
+	auto cars = gw.GetCars();
+	for (int i = 0; i < cars.Count(); i++) {
+		auto car = cars.Get(i);
+		if (car.IsNull()) continue;
+		
+		auto boostCom = car.GetBoostComponent();
+		if (boostCom.IsNull()) continue;
+		
+		int boost = int(boostCom.GetCurrentBoostAmount() * 100);
+		
+		// Only process if boost value changed
+		if (boost == Boosts[i]) continue;
+		
+		std::string playerId = isDebug ? "Player_Bot_" + car.GetOwnerName() : DisplayName2Id[car.GetOwnerName()];
+		if (OwnerIndexMap.count(playerId) == 0) continue;
+		
+		// Create and send JSON only when boost changed
+		json root, j;
+		j["boost"] = boost;
+		j["index"] = OwnerIndexMap[playerId];
+		root["cmd"] = "boost";
+		root["data"] = j;
+		sendSocket(root.dump());
+		
+		Boosts[i] = boost;
 	}
 }
 
@@ -501,11 +649,14 @@ void Mugi::tickPlayer(std::string actorName) {
 
 void Mugi::tick(std::string eventName) {
 	auto gw = gameWrapper->GetOnlineGame();
-	if (gw.IsNull())return;
+	if (gw.IsNull()) return;
+	
 	CameraWrapper camera = gameWrapper->GetCamera();
-	std::string actorName = camera.GetFocusActor();
-	if (!isDebug)actorName = split(camera.GetFocusActor());
-	//----------tick------------//
+	std::string focusActorRaw = camera.GetFocusActor();
+	if (focusActorRaw.empty()) return;
+	
+	std::string actorName = isDebug ? focusActorRaw : split(focusActorRaw);
+	
 	tickPlayer(actorName);
 	tickBoost(gw);
 	tickScore(actorName);
@@ -523,4 +674,99 @@ std::string Mugi::split(const std::string& s) {
 	}
 	if (elems.size() != 3)return "";
 	return elems[1];
+}
+
+void Mugi::startReceiver() {
+	isReceiving = true;
+	receiverThread = std::thread(&Mugi::receiveLoop, this);
+	cvarManager->log("Receiver thread started");
+}
+
+void Mugi::stopReceiver() {
+	isReceiving = false;
+	if (receiverThread.joinable()) {
+		receiverThread.join();
+		cvarManager->log("Receiver thread stopped");
+	}
+}
+
+void Mugi::receiveLoop() {
+	char buffer[1024];
+	struct sockaddr_in clientAddr;
+	int clientAddrLen = sizeof(clientAddr);
+	
+	while (isReceiving) {
+		int bytesReceived = recvfrom(sock, buffer, sizeof(buffer) - 1, 0, 
+									(struct sockaddr*)&clientAddr, &clientAddrLen);
+		
+		if (bytesReceived > 0) {
+			buffer[bytesReceived] = '\0';
+			std::string command(buffer);
+			processCommand(command);
+		}
+		else if (bytesReceived == SOCKET_ERROR) {
+			int error = WSAGetLastError();
+			if (error != WSAEWOULDBLOCK && isReceiving) {
+				cvarManager->log("Receive error: " + std::to_string(error));
+			}
+		}
+		
+		// Small delay to prevent busy waiting
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+}
+
+void Mugi::processCommand(const std::string& command) {
+	try {
+		json request = json::parse(command);
+		
+		if (!request.contains("cmd")) {
+			cvarManager->log("Invalid command: missing 'cmd' field");
+			return;
+		}
+		
+		std::string cmd = request["cmd"];
+		cvarManager->log("Received command: " + cmd);
+		
+		if (cmd == "getVersion") {
+			json response;
+			response["cmd"] = "version";
+			response["data"]["version"] = plugin_version;
+			response["data"]["status"] = "ok";
+			response["data"]["buildTime"] = __DATE__ " " __TIME__;
+			
+			sendSocket(response.dump());
+			cvarManager->log("Version info sent: " + std::string(plugin_version));
+		}
+		else if (cmd == "ping") {
+			json response;
+			response["cmd"] = "pong";
+			response["data"]["status"] = "ok";
+			response["data"]["timestamp"] = std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::system_clock::now().time_since_epoch()).count();
+			
+			sendSocket(response.dump());
+			cvarManager->log("Pong response sent");
+		}
+		else {
+			cvarManager->log("Unknown command: " + cmd);
+			
+			json response;
+			response["cmd"] = "error";
+			response["data"]["message"] = "Unknown command: " + cmd;
+			response["data"]["status"] = "error";
+			
+			sendSocket(response.dump());
+		}
+	}
+	catch (const json::exception& e) {
+		cvarManager->log("JSON parse error: " + std::string(e.what()));
+		
+		json response;
+		response["cmd"] = "error";
+		response["data"]["message"] = "Invalid JSON format";
+		response["data"]["status"] = "error";
+		
+		sendSocket(response.dump());
+	}
 }

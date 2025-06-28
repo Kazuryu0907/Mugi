@@ -7,9 +7,21 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <unordered_map>
+#include <thread>
+#include <atomic>
 
 #include "version.h"
 constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "." stringify(VERSION_BUILD);
+
+// Network constants
+constexpr int DEFAULT_PORT = 12345;
+constexpr const char* DEFAULT_ADDRESS = "127.0.0.1";
+
+// Game constants
+constexpr int OVERTIME_START_OFFSET = 4;
+constexpr int MAX_BOOST_SLOTS = 10;
+constexpr int MAX_BOT_COUNT = 6;
+constexpr unsigned char SPECTATOR_TEAM_NUM = 255;
 
 
 class Mugi: public BakkesMod::Plugin::BakkesModPlugin
@@ -34,22 +46,33 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	void tickScore(std::string);
 	void onGoal(ActorWrapper caller);
 	void initSocket();
+	void initSocket2();
 	void endSocket();
-//	void calcSetPoint(ServerWrapper sw);
-//	void resetSetPoint(ServerWrapper sw);
-	void sendTeamNames(ServerWrapper);
 	bool sendSocket(std::string);
 	void endGame(std::string);
+	
+	void startReceiver();
+	void stopReceiver();
+	void receiveLoop();
+	void processCommand(const std::string& command);
 
 	std::string split(const std::string& s);
 	//std::string split(const std::string& s);
 	//void onUnload() override; // Uncomment and implement if you need a unload method
 
 private:
-	int PORT = 12345;
-	std::string ADDR = "127.0.0.1";
+	int PORT = DEFAULT_PORT;
+	std::string ADDR = DEFAULT_ADDRESS;
 	SOCKET sock;
+	SOCKET sock2;
 	struct sockaddr_in server;
+	struct sockaddr_in server2;
+	struct sockaddr_in multicast_addr;
+	bool isSocketInitialized = false;
+	bool isSocketInitialized2 = false;
+	
+	std::thread receiverThread;
+	std::atomic<bool> isReceiving;
 	std::unordered_map<std::string, std::shared_ptr<PriWrapper>> PlayerMap;
 	bool isBoostWatching = true;
 	struct playerData {
@@ -83,24 +106,16 @@ private:
 	struct s_preTeamName preTeamName;
 	std::string preMatchId;
 
-	int Boosts[10];
-	int botIndex[6] = { 0,0,0,0,0,0 };
+	int Boosts[MAX_BOOST_SLOTS] = {0};
+	int botIndex[MAX_BOT_COUNT] = { 0,0,0,0,0,0 };
 	std::unordered_map<std::string, std::string> botId2Id;
 	std::unordered_map<std::string, std::string> DisplayName2Id;
 	std::unordered_map<std::string, std::string> Id2DisplayName;
-	std::unordered_map<std::string, std::string> Id2DisplayName_debug;
-	std::unordered_map<std::string, std::string> PlayerToDisplayName;
-	std::unordered_map<std::string, std::string> UniqueID2DisplayName;
 	std::string preActorName = "";
 	int currentFocusActorScore = 0;
-	std::string preAutoCamActorName = "";
-	std::string currentFocusActorName = "";
 	std::string preFocusActorName = "";
 	int overtimeOffset = 0;
 	int preFocusActorScore = 0;
-	int dst_socket;
-	std::string preMsg = "";
-	std::string msg = "";
 	bool isSendSocket = true;
 	bool isDebug = false;
 
