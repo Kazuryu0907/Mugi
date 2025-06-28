@@ -196,7 +196,7 @@ bool Mugi::sendSocket(std::string str) {
 
 void Mugi::endSocket() {
 	closesocket(sock);
-	closesocket(sock2)
+	closesocket(sock2);
 	WSACleanup();
 }
 
