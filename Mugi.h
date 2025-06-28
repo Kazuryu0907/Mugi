@@ -49,7 +49,9 @@ private:
 	int PORT = 12345;
 	std::string ADDR = "127.0.0.1";
 	SOCKET sock;
+	SOCKET sock2;
 	struct sockaddr_in server;
+	struct sockaddr_in server2;
 	std::unordered_map<std::string, std::shared_ptr<PriWrapper>> PlayerMap;
 	bool isBoostWatching = true;
 	struct playerData {

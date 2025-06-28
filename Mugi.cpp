@@ -180,15 +180,23 @@ void Mugi::initSocket() {
 	server.sin_port = htons(PORT);
 	inet_pton(server.sin_family, ADDR.c_str(), &server.sin_addr.s_addr);
 	connect(sock, (struct sockaddr*)&server, sizeof(server));
+	struct sockaddr_in server2;
+	sock2 = socket(AF_INET, SOCK_DGRAM, 0);
+	server2.sin_family = AF_INET;
+	server2.sin_port = htons(12344);
+	inet_pton(server2.sin_family, ADDR.c_str(), &server2.sin_addr.s_addr);
+	connect(sock2, (struct sockaddr*)&server2, sizeof(server2));
 }
 
 bool Mugi::sendSocket(std::string str) {
 	bool res = send(sock, str.c_str(), str.length(), 0);
+	send(sock2, str.c_str(), str.length(), 0);
 	return res;
 }
 
 void Mugi::endSocket() {
-	closesocket(dst_socket);
+	closesocket(sock);
+	closesocket(sock2)
 	WSACleanup();
 }
 
