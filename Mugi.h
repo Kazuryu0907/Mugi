@@ -46,6 +46,7 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 	void tickScore(std::string);
 	void onGoal(ActorWrapper caller);
 	void initSocket();
+	void initSocket2();
 	void endSocket();
 	bool sendSocket(std::string);
 	void endGame(std::string);
@@ -68,6 +69,7 @@ private:
 	struct sockaddr_in server2;
 	struct sockaddr_in multicast_addr;
 	bool isSocketInitialized = false;
+	bool isSocketInitialized2 = false;
 	
 	std::thread receiverThread;
 	std::atomic<bool> isReceiving;

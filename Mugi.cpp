@@ -184,8 +184,7 @@ void Mugi::initSocket() {
 	}
 	
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
-	sock2 = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sock == INVALID_SOCKET || sock2 == INVALID_SOCKET) {
+	if (sock == INVALID_SOCKET) {
 		cvarManager->log("Socket creation failed with error: " + std::to_string(WSAGetLastError()));
 		WSACleanup();
 		return;
@@ -193,9 +192,6 @@ void Mugi::initSocket() {
 	
 	server.sin_family = AF_INET;
 	server.sin_port = htons(PORT);
-	// server2
-	server2.sin_family = AF_INET;
-	server2.sin_port = htons(12344);
 	// multi cast
 	// multicast_addr.sin_family = AF_INET;
 	// multicast_addr.sin_port = htons(12346);
@@ -204,12 +200,6 @@ void Mugi::initSocket() {
 	if (inet_pton(server.sin_family, ADDR.c_str(), &server.sin_addr.s_addr) <= 0) {
 		cvarManager->log("Invalid address format: " + ADDR);
 		closesocket(sock);
-		WSACleanup();
-		return;
-	}
-	if (inet_pton(server2.sin_family, ADDR.c_str(), &server2.sin_addr.s_addr) <= 0) {
-		cvarManager->log("Invalid address format: " + ADDR);
-		closesocket(sock2);
 		WSACleanup();
 		return;
 	}
@@ -228,23 +218,11 @@ void Mugi::initSocket() {
 		return;
 	}
 	
-	if (bind(sock2, (struct sockaddr*)&server2, sizeof(server2)) == SOCKET_ERROR) {
-		cvarManager->log("Bind failed with error: " + std::to_string(WSAGetLastError()));
-		closesocket(sock2);
-		WSACleanup();
-		return;
-	}
 	// Set socket to non-blocking mode for receive operations
 	u_long mode = 1;
 	if (ioctlsocket(sock, FIONBIO, &mode) == SOCKET_ERROR) {
 		cvarManager->log("Setting non-blocking mode failed: " + std::to_string(WSAGetLastError()));
 		closesocket(sock);
-		WSACleanup();
-		return;
-	}
-	if (ioctlsocket(sock2, FIONBIO, &mode) == SOCKET_ERROR) {
-		cvarManager->log("Setting non-blocking mode failed: " + std::to_string(WSAGetLastError()));
-		closesocket(sock2);
 		WSACleanup();
 		return;
 	}
@@ -255,35 +233,85 @@ void Mugi::initSocket() {
 	startReceiver();
 }
 
+void Mugi::initSocket2() {
+	WSADATA wsaData;
+	struct sockaddr_in server;
+	cvarManager->log("initializing socket2...");
+	isSocketInitialized2 = false;
+	
+	if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0) {
+		cvarManager->log("WSAStartup failed with error: " + std::to_string(WSAGetLastError()));
+		return;
+	}
+	
+	sock2 = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock2 == INVALID_SOCKET) {
+		cvarManager->log("Socket creation failed with error: " + std::to_string(WSAGetLastError()));
+		WSACleanup();
+		return;
+	}
+	
+	server2.sin_family = AF_INET;
+	server2.sin_port = htons(12344);
+	if (inet_pton(server2.sin_family, ADDR.c_str(), &server2.sin_addr.s_addr) <= 0) {
+		cvarManager->log("Invalid address format: " + ADDR);
+		closesocket(sock2);
+		WSACleanup();
+		return;
+	}
+	
+	// Bind socket for receiving
+	if (bind(sock2, (struct sockaddr*)&server2, sizeof(server2)) == SOCKET_ERROR) {
+		cvarManager->log("Bind failed with error 12344: " + std::to_string(WSAGetLastError()));
+		closesocket(sock2);
+		WSACleanup();
+		return;
+	}
+	// Set socket to non-blocking mode for receive operations
+	u_long mode = 1;
+	if (ioctlsocket(sock2, FIONBIO, &mode) == SOCKET_ERROR) {
+		cvarManager->log("Setting non-blocking mode failed: " + std::to_string(WSAGetLastError()));
+		closesocket(sock2);
+		WSACleanup();
+		return;
+	}
+	
+	isSocketInitialized2 = true;
+	cvarManager->log("Socket2 initialized successfully");
+}
 bool Mugi::sendSocket(std::string str) {
 	if (!isSocketInitialized) {
 		cvarManager->log("Socket not initialized, cannot send data");
-		return false;
+		// return false;
+	}else{
+		// For UDP, we need to use sendto with destination address
+		struct sockaddr_in destAddr;
+		destAddr.sin_family = AF_INET;
+		destAddr.sin_port = htons(PORT);
+		inet_pton(AF_INET, ADDR.c_str(), &destAddr.sin_addr.s_addr);
+		
+		int result = sendto(sock, str.c_str(), str.length(), 0, 
+							(struct sockaddr*)&destAddr, sizeof(destAddr));
+		if (result == SOCKET_ERROR) {
+			cvarManager->log("Socket send error: " + std::to_string(WSAGetLastError()));
+		}
 	}
 	
-	// For UDP, we need to use sendto with destination address
-	struct sockaddr_in destAddr;
-	destAddr.sin_family = AF_INET;
-	destAddr.sin_port = htons(PORT);
-	inet_pton(AF_INET, ADDR.c_str(), &destAddr.sin_addr.s_addr);
-	
-	int result = sendto(sock, str.c_str(), str.length(), 0, 
-						(struct sockaddr*)&destAddr, sizeof(destAddr));
-	if (result == SOCKET_ERROR) {
-		cvarManager->log("Socket send error: " + std::to_string(WSAGetLastError()));
-		return false;
-	}
-	// sock2
-	struct sockaddr_in destAddr2;
-	destAddr2.sin_family = AF_INET;
-	destAddr2.sin_port = htons(12344);
-	inet_pton(AF_INET, ADDR.c_str(), &destAddr2.sin_addr.s_addr);
-	
-	int result2 = sendto(sock2, str.c_str(), str.length(), 0, 
-						(struct sockaddr*)&destAddr2, sizeof(destAddr2));
-	if (result2 == SOCKET_ERROR) {
-		cvarManager->log("Socket send error: " + std::to_string(WSAGetLastError()));
-		return false;
+	if (!isSocketInitialized2) {
+		cvarManager->log("Socket2 not initialized, cannot send data");
+	}else{
+		// sock2
+		struct sockaddr_in destAddr2;
+		destAddr2.sin_family = AF_INET;
+		destAddr2.sin_port = htons(12344);
+		inet_pton(AF_INET, ADDR.c_str(), &destAddr2.sin_addr.s_addr);
+		
+		int result2 = sendto(sock2, str.c_str(), str.length(), 0, 
+							(struct sockaddr*)&destAddr2, sizeof(destAddr2));
+		if (result2 == SOCKET_ERROR) {
+			cvarManager->log("Socket2 send error: " + std::to_string(WSAGetLastError()));
+			// return false;
+		}
 	}
 	// if(sendto(sock2, str.c_str(), str.length(), 0, (sockaddr*)&multicast_addr, sizeof(multicast_addr)) == SOCKET_ERROR) {
 	// 	cvarManager->log("Multicast send error: " + std::to_string(WSAGetLastError()));
@@ -298,10 +326,15 @@ void Mugi::endSocket() {
 	if (isSocketInitialized) {
 		stopReceiver();
 		closesocket(sock);
-		closesocket(sock2);
 		WSACleanup();
 		isSocketInitialized = false;
 		cvarManager->log("Socket closed successfully");
+	}
+	if (isSocketInitialized2) {
+		closesocket(sock2);
+		WSACleanup();
+		isSocketInitialized2 = false;
+		cvarManager->log("Socket2 closed successfully");
 	}
 }
 
