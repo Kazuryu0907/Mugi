@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "Mugi.h"
 #include "nlohmann/json.hpp"
+#include <sstream>
 
 #define TOS(i) std::to_string(i)
 
@@ -11,6 +12,7 @@ using json = nlohmann::json;
 
 void Mugi::onLoad()
 {
+	_globalCvarManager = cvarManager;
 	cvarManager->log("init Sock");
 	initSocket();
 	json root;
@@ -199,6 +201,8 @@ void Mugi::endSocket() {
 	closesocket(sock2);
 	WSACleanup();
 }
+
+
 
 void Mugi::scored(std::string eventName) {
 	json root;
@@ -425,7 +429,10 @@ void Mugi::updateTime(std::string eventName)
 	j["time"] = time;
 	j["isOvertime"] = sw.GetbOverTime();
 	root["data"] = j;
-	sendSocket(root.dump());
+	// sendSocket(root.dump());
+	json fb_data;
+	fb_data["blue_setPoint"] = time;
+	httpPatchFirebase("https://moca-8f967-default-rtdb.asia-southeast1.firebasedatabase.app/match_info.json", "PATCH", fb_data.dump());
 }
 
 void Mugi::tickBoost(ServerWrapper gw) {

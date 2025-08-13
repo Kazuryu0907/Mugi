@@ -3,7 +3,8 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "C:/Users/kazum/AppData/Roaming/bakkesmod/bakkesmod/bakkesmodsdk/include"
             ],
             "defines": [
                 "_DEBUG",

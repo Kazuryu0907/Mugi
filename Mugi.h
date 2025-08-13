@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include "version.h"
+#include "HttpClient.h"
 constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "." stringify(VERSION_BUILD);
 
 
@@ -39,6 +40,7 @@ class Mugi: public BakkesMod::Plugin::BakkesModPlugin
 //	void resetSetPoint(ServerWrapper sw);
 	void sendTeamNames(ServerWrapper);
 	bool sendSocket(std::string);
+
 	void endGame(std::string);
 
 	std::string split(const std::string& s);

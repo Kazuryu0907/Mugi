@@ -9,9 +9,13 @@
 #include <functional>
 #include <memory>
 
+#include <windows.h>
+#include <winhttp.h>
+
 #include "IMGUI/imgui.h"
 #include "IMGUI/imgui_stdlib.h"
 #include "IMGUI/imgui_searchablecombo.h"
 #include "IMGUI/imgui_rangeslider.h"
 
 #include "logging.h"
+#pragma comment (lib, "winhttp.lib")
