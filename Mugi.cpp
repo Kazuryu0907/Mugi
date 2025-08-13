@@ -15,9 +15,11 @@ void Mugi::onLoad()
 	_globalCvarManager = cvarManager;
 	cvarManager->log("init Sock");
 	initSocket();
+	initWinHttp();
 	json root;
 	root["cmd"] = "init";
 	sendSocket(root.dump());
+	fb_update_status_async("init");
 	createNameTable(true);
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.OnGameTimeUpdated", std::bind(&Mugi::updateTime, this, std::placeholders::_1));
 	gameWrapper->HookEvent("Function TAGame.GameEvent_Soccar_TA.EventMatchEnded", std::bind(&Mugi::endGame, this, std::placeholders::_1));
@@ -39,6 +41,7 @@ void Mugi::onLoad()
 		json root;
 		root["cmd"] = "endReplay";
 		sendSocket(root.dump());
+		fb_update_status_async("endReplay");
 		});
 	gameWrapper->HookEventWithCaller<CarWrapper>("Function TAGame.GameEvent_TA.OnReplicatedDemolish", [this](CarWrapper caller, void* params, std::string eventname) {
 		cvarManager->log("demolished by ");
@@ -55,6 +58,7 @@ void Mugi::onLoad()
 		json root;
 		root["cmd"] = "endStats";
 		sendSocket(root.dump());
+		fb_update_status_async("endStats");
 		});
 
 	// To Get TeamNames
@@ -138,6 +142,7 @@ void Mugi::onLoad()
 void Mugi::onUnload()
 {
 	endSocket();
+	closeWinHttp();
 	gameWrapper->UnhookEvent("Function TAGame.GameEvent_Soccar_TA.OnGameTimeUpdated");
 	gameWrapper->UnhookEvent("Function TAGame.GameEvent_Soccar_TA.EventMatchEnded");
 	gameWrapper->UnhookEvent("Function TAGame.ReplayDirector_TA.Tick");
@@ -208,6 +213,7 @@ void Mugi::scored(std::string eventName) {
 	json root;
 	root["cmd"] = "scored";
 	sendSocket(root.dump());
+	fb_update_status_async("scored");
 }
 
 void Mugi::startGame(std::string eventName) {
@@ -231,7 +237,10 @@ void Mugi::startGame(std::string eventName) {
 	}
 	root["cmd"] = "start";
 	root["data"] = 0;
-	if (sw.GetTotalScore() == 0)sendSocket(root.dump());
+	if (sw.GetTotalScore() == 0){
+		sendSocket(root.dump());
+		fb_update_status_async("start");
+	}
 }
 
 
@@ -249,6 +258,7 @@ void Mugi::endGame(std::string eventName) {
 	json root;
 	root["cmd"] = "end";
 	sendSocket(root.dump());
+	fb_update_status_async("end");
 	std::vector<json> Stats;
 	ArrayWrapper<PriWrapper> pls = sw.GetPRIs();
 	cvarManager->log(TOS(sw.GetMatchWinner().GetScore()));
@@ -429,10 +439,8 @@ void Mugi::updateTime(std::string eventName)
 	j["time"] = time;
 	j["isOvertime"] = sw.GetbOverTime();
 	root["data"] = j;
-	// sendSocket(root.dump());
-	json fb_data;
-	fb_data["blue_setPoint"] = time;
-	httpPatchFirebase("https://moca-8f967-default-rtdb.asia-southeast1.firebasedatabase.app/match_info.json", "PATCH", fb_data.dump());
+	sendSocket(root.dump());
+	fb_update_time_async(time);
 }
 
 void Mugi::tickBoost(ServerWrapper gw) {
@@ -454,7 +462,10 @@ void Mugi::tickBoost(ServerWrapper gw) {
 			j["index"] = OwnerIndexMap[playerId];
 			root["cmd"] = "boost";
 			root["data"] = j;
-			if (boost != Boosts[i])sendSocket(root.dump());
+			if (boost != Boosts[i]){
+				sendSocket(root.dump());
+				fb_update_boost_async(OwnerIndexMap[playerId], boost);
+			}
 			Boosts[i] = boost;
 		}
 	}
@@ -524,6 +535,8 @@ void Mugi::tick(std::string eventName) {
 	tickPlayer(actorName);
 	tickBoost(gw);
 	tickScore(actorName);
+	// Process async HTTP requests
+	processAsyncRequests();
 }
 
 
