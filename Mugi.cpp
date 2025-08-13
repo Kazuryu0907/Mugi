@@ -328,7 +328,7 @@ void Mugi::createNameTable(bool isForcedRun)
 	PlayerMap.clear();
 	OwnerMap.clear();
 	DisplayName2Id.clear();
-	UniqueID2DisplayName.clear();
+
 	OwnerIndexMap.clear();
 	//----------------//
 	int botBlueNum = 0;
