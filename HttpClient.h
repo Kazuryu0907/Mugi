@@ -51,10 +51,9 @@ struct AsyncHttpRequest {
     }
 };
 
-// Original synchronous functions
+// WinHTTP session management
 bool initWinHttp();
 bool closeWinHttp();
-bool httpPatchFirebase(const std::string& url, const std::string& method, const std::string& jsonData);
 
 // New async functions
 RequestId httpPatchFirebaseAsync(const std::string& url, const std::string& method, const std::string& jsonData, HttpCallback callback = nullptr);
@@ -62,11 +61,7 @@ void processAsyncRequests();
 void cancelRequest(RequestId id);
 void cancelAllRequests();
 
-// Firebase convenience functions (remain synchronous interface, async implementation)
-bool fb_update_time(int time);
-bool fb_update_status(const std::string& status);
-
-// Firebase async versions
+// Firebase async functions
 RequestId fb_update_time_async(int time, HttpCallback callback = nullptr);
 RequestId fb_update_status_async(const std::string& status, HttpCallback callback = nullptr);
 RequestId fb_update_boost_async(int index, int boost, HttpCallback callback = nullptr);
